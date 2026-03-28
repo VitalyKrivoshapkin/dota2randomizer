@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Drafter (v8.20)</title>
+    <title>Dota 2 Drafter (v8.21)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -62,7 +62,7 @@
                     </div>
                     <div>
                         <h1 class="text-3xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">DOTA 2 DRAFTER</h1>
-                        <p id="room-display" class="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO EDITION v8.20</p>
+                        <p id="room-display" class="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO EDITION v8.21</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3" id="header-controls"></div>
@@ -77,7 +77,6 @@
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Fallback configuration for external environments (GitHub Pages, etc.)
         const manualConfig = { 
             apiKey: "AIzaSyBOv8Tf0Z-XnSp3DUHstPo7FZyb1SPuAgA", 
             authDomain: "project-578-032.firebaseapp.com", 
@@ -107,7 +106,7 @@
             pickDuration: 20, infinitePickTime: false
         };
         let isLocalMode = false;
-        let poolAnimationPlayed = false;
+        let poolAnimationPlayed = true; // Default to true, reset only on init
         let botActionTimeout = null;
         let tagManagerScrollTop = 0;
 
@@ -213,13 +212,33 @@
         window.toggleHeroPosition = async (heroId, pos) => { if (!isAdmin()) return; const custom = { ...roomData.customHeroPositions }; let cur = custom[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; custom[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos]; updateRoom({ customHeroPositions: custom }); };
         window.toggleExcludeHero = async (id) => { if (!isAdmin()) return; const current = roomData.excludedHeroIds || []; updateRoom({ excludedHeroIds: current.includes(id) ? current.filter(x => x !== id) : [...current, id] }); };
         window.confirmTeamsAction = async () => { if (!isAdmin()) return; const r = roomData.players.filter(x => x.team === 'Radiant').length, d = roomData.players.filter(x => x.team === 'Dire').length; updateRoom({ stage: 'init', teamSizeRadiant: r, teamSizeDire: d, draftSequence: getStrategies(r, d)[roomData.strategyIdx].seq }); };
-        window.startOverAction = async () => { if (!isAdmin()) return; if (isLocalMode) { window.location.reload(); return; } await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id)); };
+        
+        window.startOverAction = async () => { 
+            if (!isAdmin()) return; 
+            // Reset state while keeping participants and their UID
+            const resetPlayers = roomData.players.map(p => ({ ...p, team: 'unassigned', slot: -1 }));
+            const resetData = {
+                stage: 'lobby',
+                players: resetPlayers,
+                pool: [],
+                bans: [],
+                picksRadiant: [],
+                picksDire: [],
+                votes: {},
+                pendingHeroId: null,
+                isExtraTime: false,
+                timerEnd: 0
+            };
+            await updateRoom(resetData);
+        };
+
         window.startDraftSetup = async () => { if (!isAdmin()) return; updateRoom({ stage: 'setup' }); };
         
         window.generatePoolAction = async () => {
             if (!isAdmin()) return;
             let pl = []; let used = new Set(); const excluded = new Set(roomData.excludedHeroIds || []);
             roomData.nValues.forEach((n, i) => { const pos = i + 1; HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excluded.has(h.id)).sort(() => 0.5 - Math.random()).slice(0, n).forEach(h => { used.add(h.id); pl.push(h); }); });
+            poolAnimationPlayed = false; // Trigger animation for the NEW list
             updateRoom({ pool: pl, stage: 'banning', bans: [], picksRadiant: [], picksDire: [], timerEnd: Date.now() + getTurnDuration('banning') + ANIM_DELAY, isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant' });
         };
         
@@ -229,7 +248,6 @@
             const h = roomData.pool.find(x => x.id === hId);
             if (!h) return;
             
-            // Assignment logic fixed to use turnP.team instead of roomData.currentTurnTeam for robustness
             if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), h] });
             else await updateRoom({ picksDire: [...(roomData.picksDire||[]), h] });
             
@@ -276,7 +294,7 @@
                 <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-red-600 mb-6 uppercase text-right">Dire</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Dire' && x.slot === i); return `<div onclick="joinTeamAction('Dire', ${i})" class="slot-box ${p?'player-active border-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.1)]':'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}</div>` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
                 <div class="lg:col-span-2 flex flex-col md:flex-row gap-6">
                     <div class="flex-1 p-6 bg-white/5 rounded-3xl border border-white/5 flex flex-wrap gap-3">${players.filter(p => p.team === 'unassigned').map(p => `<div class="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-xl border border-white/5"><img src="${p.photo}" class="w-5 h-5 rounded"><span class="text-[10px] font-bold uppercase">${p.name}</span></div>`).join('')}<div onclick="joinTeamAction('unassigned', -1)" class="w-10 h-10 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:bg-white/5"><i data-lucide="user-minus" class="w-4 h-4 opacity-30"></i></div></div>
-                    <div class="team-card p-6 rounded-[2rem] bg-amber-500/5 border-amber-500/10 flex flex-col gap-3 min-w-[240px]">${host ? `<button onclick="shuffleAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Shuffle Teams</button><button onclick="addBotAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Add Bot</button><button onclick="startDraftSetup()" class="w-full py-4 bg-amber-500 text-black rounded-2xl font-black uppercase text-xs mt-2 transition-all active:scale-95">Start</button>` : `<div class="py-4 text-center"><p class="text-[10px] font-black text-slate-600 animate-pulse uppercase">Waiting...</p></div>`}</div>
+                    <div class="team-card p-6 rounded-[2rem] bg-amber-500/5 border-amber-500/10 flex flex-col gap-3 min-w-[240px]">${host ? `<button onclick="shuffleAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Shuffle Teams</button><button onclick="addBotAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Add Bot</button><button onclick="startDraftSetup()" class="w-full py-4 bg-amber-500 text-black rounded-2xl font-black uppercase text-xs mt-2 transition-all active:scale-95 shadow-lg shadow-amber-500/20">Start</button>` : `<div class="py-4 text-center"><p class="text-[10px] font-black text-slate-600 animate-pulse uppercase">Waiting...</p></div>`}</div>
                 </div>
             </div>`;
             lucide.createIcons();
@@ -440,18 +458,14 @@
                         </div><div class="team-card p-8 rounded-[3rem] border-4 transition-all duration-700 ${roomData.currentTurnTeam==='Dire'?'border-red-600':'border-transparent'}"><h3 class="text-2xl font-black text-red-600 mb-6 italic text-right uppercase text-center">DIRE</h3><div class="grid grid-cols-5 gap-3">${renderSlots('Dire', roomData.picksDire, roomData.teamSizeDire)}</div></div></div>
                     <div class="bg-[#15171e] p-8 rounded-[4rem] border border-white/5 shadow-2xl relative"><div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-x-6 gap-y-10">${sortedPool.map((h, idx) => {
                         const isBan = roomData.bans.find(x=>x.id===h.id), isPick = [...(roomData.picksRadiant||[]), ...(roomData.picksDire||[])].find(x=>x.id===h.id);
-                        
-                        // Sync visual: all users should see scaling based on current active team votes
                         const activeTeamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
                         const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
                         const bSize = 8 + (vCount * 4); 
-                        
                         const myV = roomData.votes[localUser.uid] === h.id, teamV = roomData.players.filter(p => p.team === myT && roomData.votes[p.uid] === h.id);
                         const oppV = Object.entries(roomData.votes || {}).some(([uid, hid]) => { const vP = roomData.players.find(p => p.uid === uid); return vP && vP.team !== myT && hid === h.id; });
                         const pend = roomData.pendingHeroId === h.id;
                         const anim = !poolAnimationPlayed, del = sortedPool.length > 0 ? (5 / sortedPool.length) : 0;
-                        
-                        return `<div onclick="handleHeroClick(${h.id})" class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 cursor-pointer" style="${anim ? `animation-delay: ${idx * del}s` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && (vCount > 0 || oppV) ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan?'hero-banned-fx':isPick?'hero-picked-fx':''}">
+                        return `<div onclick="handleHeroClick(${h.id})" class="${(anim && !isR) ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 cursor-pointer" style="${(anim && !isR) ? `animation-delay: ${idx * del}s` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && (vCount > 0 || oppV) ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan?'hero-banned-fx':isPick?'hero-picked-fx':''}">
                             ${getHeroImg(h)}${isB && (vCount > 0 || oppV) ? `<div class="absolute inset-0 bg-red-600/10 flex items-center justify-center pointer-events-none"><span class="text-white font-black uppercase bg-red-600 px-1.5 rounded -rotate-12 shadow-lg" style="font-size: ${bSize}px">BAN</span></div>` : ''}${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-1.5 rounded">PICK</span></div>` : ''}
                             <div class="absolute top-1 right-1 flex flex-wrap-reverse gap-0.5 justify-end">${teamV.map(v => `<img src="${v.photo}" class="w-4 h-4 rounded-sm border border-white/50 bg-black shadow-md">`).join('')}</div></div><span class="text-[8px] font-black uppercase text-slate-600 group-hover:text-white truncate w-full text-center">${h.name}</span></div>`;
                     }).join('')}</div></div></div>`;
@@ -550,14 +564,34 @@
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
             try {
                 const snap = await getDoc(ref); if (!snap.exists()) await setDoc(ref, initD);
-                else { let p = snap.data().players || []; if (!p.find(x => x.uid === localUser.uid)) { p.push({...localUser, team: 'unassigned', slot: -1}); await updateDoc(ref, { players: p }); } }
-                onSnapshot(ref, d => { if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); } else { const oldS = roomData.stage; roomData = d.data(); if (oldS !== roomData.stage) poolAnimationPlayed = false; render(); } });
+                else { 
+                    let p = snap.data().players || []; 
+                    if (!p.find(x => x.uid === localUser.uid)) { 
+                        p.push({...localUser, team: 'unassigned', slot: -1}); 
+                        await updateDoc(ref, { players: p }); 
+                    } 
+                }
+                onSnapshot(ref, d => { 
+                    if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); } 
+                    else { 
+                        const newData = d.data();
+                        const oldStage = roomData.stage;
+                        roomData = newData;
+                        // Animation flag logic: reset only when transitioning setup -> init
+                        if (oldStage === 'setup' && roomData.stage === 'init') {
+                            poolAnimationPlayed = false;
+                        }
+                        render(); 
+                    } 
+                });
             } catch (e) { console.error(e); }
         };
 
         onAuthStateChanged(auth, u => {
-            if (u && !isLocalMode && u.providerData.length > 0) { localUser = { uid: u.uid, name: u.displayName || "Elite", photo: u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.uid}` }; render(); }
-            else if (!isLocalMode && !localUser.uid) renderEntry(document.getElementById('main-content'));
+            if (u && !isLocalMode && u.providerData.length > 0) { 
+                localUser = { uid: u.uid, name: u.displayName || "Elite", photo: u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.uid}` }; 
+                render(); 
+            } else if (!isLocalMode && !localUser.uid) renderEntry(document.getElementById('main-content'));
         });
         setInterval(timerLogic, 100);
         window.onload = render;
