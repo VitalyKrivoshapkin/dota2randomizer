@@ -3,147 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Multiplayer Drafter</title>
+    <title>Dota 2 Multiplayer Drafter (Google Auth)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0b0d;
-            color: #f1f5f9;
-            overflow-x: hidden;
-        }
-
-        .hero-img-container {
-            aspect-ratio: 12 / 16;
-            background-color: #1a1d24;
-            overflow: hidden;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .hero-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
-
-        .group:hover .hero-img {
-            transform: scale(1.1);
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { opacity: 0.6; filter: blur(10px); }
-            50% { opacity: 1; filter: blur(20px); }
-        }
-
-        .animate-pulse-glow {
-            animation: pulse-glow 2s infinite;
-        }
-
-        @keyframes text-shimmer {
-            0% { background-position: -200% center; }
-            100% { background-position: 200% center; }
-        }
-
-        .text-shimmer {
-            background: linear-gradient(90deg, #fff, #4ade80, #fff);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: text-shimmer 3s linear infinite;
-        }
-
-        .text-shimmer-red {
-            background: linear-gradient(90deg, #fff, #ef4444, #fff);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: text-shimmer 3s linear infinite;
-        }
-
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-        .team-card {
-            background: rgba(21, 23, 30, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.05);
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #0a0b0d; color: #f1f5f9; overflow-x: hidden; }
+        .hero-img-container { aspect-ratio: 12 / 16; background-color: #1a1d24; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
+        .hero-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
+        .group:hover .hero-img { transform: scale(1.1); }
+        @keyframes text-shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .text-shimmer { background: linear-gradient(90deg, #fff, #4ade80, #fff); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
+        .text-shimmer-red { background: linear-gradient(90deg, #fff, #ef4444, #fff); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
+        .team-card { background: rgba(21, 23, 30, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .google-btn { transition: all 0.3s ease; background: white; color: #1f2937; }
+        .google-btn:hover { background: #f3f4f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255,255,255,0.1); }
     </style>
 </head>
 <body class="selection:bg-amber-500/30">
 
     <div id="app" class="min-h-screen p-4 md:p-8">
         <div class="max-w-7xl mx-auto">
-            
             <header class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/5 pb-6">
                 <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 bg-gradient-to-br from-red-600 to-amber-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40 transform -rotate-3">
+                    <div class="w-14 h-14 bg-gradient-to-br from-red-600 to-amber-700 rounded-xl flex items-center justify-center shadow-lg transform -rotate-3">
                         <i data-lucide="sword" class="text-white w-8 h-8"></i>
                     </div>
                     <div>
                         <h1 class="text-4xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">DOTA 2 DRAFTER</h1>
-                        <p id="room-display" class="text-[11px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO DRAFTING SYSTEM v5.0</p>
+                        <p id="room-display" class="text-[11px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">GOOGLE AUTH ENABLED</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3" id="header-controls"></div>
             </header>
 
             <main id="main-content">
-                <div class="flex items-center justify-center min-h-[50vh]">
+                <div id="loading-state" class="flex flex-col items-center justify-center min-h-[50vh] gap-4">
                     <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+                    <p class="text-slate-500 animate-pulse uppercase text-xs font-black tracking-widest">Инициализация...</p>
                 </div>
             </main>
-
         </div>
     </div>
 
-    <footer class="mt-10 text-center text-slate-800 text-[11px] uppercase tracking-[0.5em] font-black pb-12 opacity-50">
-        Dota 2 Professional Random Draft System • Cloud Synced
-    </footer>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        /**
-         * ИНСТРУКЦИЯ ДЛЯ DEPLOY (ВНЕ CANVAS):
-         * 1. Зайдите на https://console.firebase.google.com/
-         * 2. Создайте проект и добавьте "Web App".
-         * 3. Скопируйте ваш объект конфигурации в переменную firebaseConfig ниже.
-         * 4. В Firebase Console включите "Authentication" (метод Anonymous) и "Firestore Database".
-         * 5. В правилах Firestore (Rules) разрешите чтение/запись: 
-         * allow read, write: if request.auth != null;
-         */
-        
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
-                apiKey: "ВАШ_API_KEY",
-                authDomain: "ВАШ_PROJECT.firebaseapp.com",
-                projectId: "ВАШ_PROJECT_ID",
-                storageBucket: "ВАШ_PROJECT.appspot.com",
-                messagingSenderId: "ВАШ_SENDER_ID",
-                appId: "ВАШ_APP_ID"
-            };
+        const manualConfig = {
+            apiKey: "AIzaSyBOv8Tf0Z-XnSp3DUHstPo7FZyb1SPuAgA",
+            authDomain: "project-578-032.firebaseapp.com",
+            projectId: "project-578-032",
+            storageBucket: "project-578-032.firebasestorage.app",
+            messagingSenderId: "599943765176",
+            appId: "1:599943765176:web:321689096ad8c008fe284d",
+            measurementId: "G-5W3HC3ZTY9"
+        };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dota-drafter-v1';
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        
-        // Уникальный ID вашего приложения для Firestore
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-dota-app-v1';
+        const provider = new GoogleAuthProvider();
 
-        // --- HERO DATA ---
+        let localUser = { name: '', uid: '', photo: '' };
+        let roomData = { id: '', stage: 'entry', players: [] };
+
+        // Данные героев (сокращено для краткости, используйте полный список из прошлых версий)
         const HEROES = [
             { id: 1, name: "Abaddon", imgName: "abaddon", positions: [3, 5] },
             { id: 2, name: "Alchemist", imgName: "alchemist", positions: [1, 2] },
@@ -273,58 +202,69 @@
 
         const CDN_BASE = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/";
 
-        let localUser = { name: '', uid: '' };
-        let roomData = {
-            id: '', stage: 'entry', players: [], teamSizeRadiant: 5, teamSizeDire: 5,
-            nValues: [5, 5, 5, 5, 5], pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: []
+        const showError = (msg) => {
+            const main = document.getElementById('main-content');
+            main.innerHTML = `<div class="p-8 text-center bg-red-500/10 border-2 border-red-500/20 rounded-3xl"><h2 class="text-xl font-black mb-2 uppercase">Ошибка</h2><p class="text-slate-400 mb-6">${msg}</p><button onclick="window.location.reload()" class="px-6 py-2 bg-red-600 rounded-lg font-black uppercase text-xs">Обновить</button></div>`;
+            lucide.createIcons();
         };
-        let searchTerm = "";
 
-        const init = async () => {
-            // Адаптивная авторизация
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                // Если мы вне Canvas, просто заходим анонимно
-                await signInAnonymously(auth);
-            }
-
+        const init = () => {
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     localUser.uid = user.uid;
+                    localUser.name = user.displayName || "Gamer";
+                    localUser.photo = user.photoURL || "";
                     render();
+                } else {
+                    renderEntry(document.getElementById('main-content'));
                 }
             });
         };
 
-        const joinRoom = async (code, nickname) => {
-            if (!code || !nickname) return;
-            localUser.name = nickname;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
-            const snap = await getDoc(roomRef);
-
-            if (!snap.exists()) {
-                const initial = {
-                    id: code, stage: 'lobby',
-                    players: [{ uid: localUser.uid, name: nickname, team: 'unassigned' }],
-                    teamSizeRadiant: 5, teamSizeDire: 5, nValues: [5, 5, 5, 5, 5],
-                    pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: []
-                };
-                await setDoc(roomRef, initial);
-            } else {
-                let players = snap.data().players || [];
-                if (!players.find(p => p.uid === localUser.uid)) {
-                    players.push({ uid: localUser.uid, name: nickname, team: 'unassigned' });
-                    await updateDoc(roomRef, { players });
-                }
+        window.loginWithGoogle = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка входа Google. Убедитесь, что вы включили Google Auth в консоли Firebase.");
             }
+        };
 
-            onSnapshot(roomRef, (doc) => {
-                if (doc.exists()) {
-                    roomData = doc.data();
-                    render();
+        window.logoutAction = async () => {
+            await signOut(auth);
+            window.location.reload();
+        };
+
+        const joinRoom = async (code) => {
+            if (!code) return;
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+            try {
+                const snap = await getDoc(roomRef);
+                const playerData = { uid: localUser.uid, name: localUser.name, photo: localUser.photo, team: 'unassigned' };
+                
+                if (!snap.exists()) {
+                    await setDoc(roomRef, {
+                        id: code, stage: 'lobby', players: [playerData],
+                        teamSizeRadiant: 5, teamSizeDire: 5, nValues: [5, 5, 5, 5, 5],
+                        pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: []
+                    });
+                } else {
+                    let players = snap.data().players || [];
+                    if (!players.find(p => p.uid === localUser.uid)) {
+                        players.push(playerData);
+                        await updateDoc(roomRef, { players });
+                    }
                 }
-            });
+
+                onSnapshot(roomRef, (doc) => {
+                    if (doc.exists()) {
+                        roomData = doc.data();
+                        render();
+                    }
+                });
+            } catch (e) {
+                showError("Ошибка доступа. Проверьте Firestore Rules в консоли Firebase.");
+            }
         };
 
         const updateRoom = async (updates) => {
@@ -333,132 +273,88 @@
             await updateDoc(roomRef, updates);
         };
 
-        // --- ЛОГИКА ---
-        const shuffleTeams = async () => {
-            let players = [...roomData.players];
-            players.sort(() => Math.random() - 0.5);
-            players.forEach((p, idx) => {
-                p.team = idx < players.length / 2 ? 'Radiant' : 'Dire';
-            });
-            await updateRoom({ players });
+        // --- UI ACTIONS ---
+        window.joinRoomAction = () => {
+            const code = document.getElementById('room-code-input').value.toUpperCase();
+            joinRoom(code);
         };
-
-        const confirmTeams = async () => {
-            const rCount = roomData.players.filter(p => p.team === 'Radiant').length;
-            const dCount = roomData.players.filter(p => p.team === 'Dire').length;
-            await updateRoom({ stage: 'init', teamSizeRadiant: rCount || 5, teamSizeDire: dCount || 5 });
+        window.shuffleAction = () => {
+            let p = [...roomData.players];
+            p.sort(() => Math.random() - 0.5);
+            p.forEach((player, i) => player.team = i < p.length/2 ? 'Radiant' : 'Dire');
+            updateRoom({ players: p });
         };
-
-        const getHeroImg = (hero) => {
-            if (!hero) return '';
-            return `
-                <img src="${CDN_BASE}${hero.imgName}.png" class="hero-img" alt="${hero.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div style="display:none" class="w-full h-full flex items-center justify-center text-2xl font-black text-slate-700 uppercase bg-slate-900">${hero.name.charAt(0)}</div>
-            `;
+        window.confirmTeamsAction = () => {
+            const r = roomData.players.filter(x => x.team === 'Radiant').length;
+            const d = roomData.players.filter(x => x.team === 'Dire').length;
+            updateRoom({ stage: 'init', teamSizeRadiant: r || 5, teamSizeDire: d || 5 });
         };
-
-        const generateDraftSequence = (rCount, dCount) => {
-            let seq = [];
-            let rAdded = 0, dAdded = 0, currentTeam = 'Radiant';
-            while (rAdded < rCount || dAdded < dCount) {
-                let target = (seq.length === 0) ? 1 : 2; 
-                let teamMax = (currentTeam === 'Radiant') ? rCount : dCount;
-                let teamCurrent = (currentTeam === 'Radiant') ? rAdded : dAdded;
-                let count = Math.min(target, teamMax - teamCurrent);
-                if (count > 0) {
-                    seq.push({ team: currentTeam, count: count });
-                    if (currentTeam === 'Radiant') rAdded += count; else dAdded += count;
-                }
-                currentTeam = (currentTeam === 'Radiant') ? 'Dire' : 'Radiant';
+        window.startDraftSetup = () => {
+            const seq = [];
+            let ra=0, da=0, ct='Radiant', rc=roomData.teamSizeRadiant, dc=roomData.teamSizeDire;
+            while(ra<rc || da<dc) {
+                let count = Math.min(seq.length===0?1:2, (ct==='Radiant'?rc-ra : dc-da));
+                if(count>0) { seq.push({team:ct, count}); if(ct==='Radiant') ra+=count; else da+=count; }
+                ct = ct==='Radiant'?'Dire':'Radiant';
             }
-            return seq;
+            updateRoom({ draftSequence: seq, stage: 'setup' });
         };
-
-        const handleHeroAction = async (heroId) => {
-            const hero = HEROES.find(h => h.id === heroId) || roomData.pool.find(h => h.id === heroId);
-            if (!hero) return;
-            if (roomData.stage === 'banning') {
-                if (roomData.bans.length < 4 && !roomData.bans.find(b => b.id === hero.id)) {
-                    const newBans = [...roomData.bans, hero];
-                    await updateRoom({ bans: newBans, stage: newBans.length === 4 ? 'picking' : 'banning' });
-                }
+        window.generatePoolAction = () => {
+            let pool = []; let used = new Set();
+            roomData.nValues.forEach((n, i) => {
+                const pos = i+1;
+                const eligible = HEROES.filter(h => h.positions.includes(pos) && !used.has(h.id))
+                    .sort(() => 0.5 - Math.random()).slice(0, n);
+                eligible.forEach(h => { used.add(h.id); pool.push(h); });
+            });
+            updateRoom({ pool, stage: 'banning' });
+        };
+        window.handleHeroClick = (id) => {
+            const h = roomData.pool.find(x => x.id === id);
+            if (!h) return;
+            if (roomData.stage === 'banning' && roomData.bans.length < 4 && !roomData.bans.find(x => x.id === id)) {
+                const b = [...roomData.bans, h];
+                updateRoom({ bans: b, stage: b.length === 4 ? 'picking' : 'banning' });
             } else if (roomData.stage === 'picking') {
-                const isUsed = roomData.bans.find(b => b.id === hero.id) || roomData.picksRadiant.find(p => p.id === hero.id) || roomData.picksDire.find(p => p.id === hero.id);
-                if (!isUsed) {
-                    const currentPicker = getCurrentPicker();
-                    if (currentPicker === 'Radiant') {
-                        const newPicks = [...roomData.picksRadiant, hero];
-                        await updateRoom({ picksRadiant: newPicks, stage: (newPicks.length === roomData.teamSizeRadiant && roomData.picksDire.length === roomData.teamSizeDire) ? 'result' : 'picking' });
+                const used = [...roomData.bans, ...roomData.picksRadiant, ...roomData.picksDire].find(x => x.id === id);
+                if (!used) {
+                    const stepIdx = (() => {
+                        let acc=0, total = roomData.picksRadiant.length + roomData.picksDire.length;
+                        for(let i=0; i<roomData.draftSequence.length; i++) {
+                            acc += roomData.draftSequence[i].count;
+                            if(total < acc) return i;
+                        }
+                        return -1;
+                    })();
+                    const step = roomData.draftSequence[stepIdx];
+                    if (!step) return;
+                    if (step.team === 'Radiant') {
+                        const p = [...roomData.picksRadiant, h];
+                        updateRoom({ picksRadiant: p, stage: (p.length === roomData.teamSizeRadiant && roomData.picksDire.length === roomData.teamSizeDire) ? 'result' : 'picking' });
                     } else {
-                        const newPicks = [...roomData.picksDire, hero];
-                        await updateRoom({ picksDire: newPicks, stage: (newPicks.length === roomData.teamSizeDire && roomData.picksRadiant.length === roomData.teamSizeRadiant) ? 'result' : 'picking' });
+                        const p = [...roomData.picksDire, h];
+                        updateRoom({ picksDire: p, stage: (p.length === roomData.teamSizeDire && roomData.picksRadiant.length === roomData.teamSizeRadiant) ? 'result' : 'picking' });
                     }
                 }
             }
         };
 
-        const getCurrentDraftStep = () => {
-            if (roomData.stage !== 'picking') return -1;
-            let totalPicked = roomData.picksRadiant.length + roomData.picksDire.length;
-            let acc = 0;
-            for (let i = 0; i < roomData.draftSequence.length; i++) {
-                acc += roomData.draftSequence[i].count;
-                if (totalPicked < acc) return i;
-            }
-            return -1;
-        };
-
-        const getCurrentPicker = () => {
-            if (roomData.stage === 'banning') return roomData.bans.length % 2 === 0 ? 'Radiant' : 'Dire';
-            if (roomData.stage === 'picking') {
-                const stepIdx = getCurrentDraftStep();
-                return stepIdx !== -1 ? roomData.draftSequence[stepIdx].team : null;
-            }
-            return null;
-        };
-
-        // --- WINDOW ACTIONS ---
-        window.joinRoomAction = () => {
-            const code = document.getElementById('room-code-input').value.toUpperCase();
-            const name = document.getElementById('nickname-input').value;
-            joinRoom(code, name);
-        };
-        window.shuffleAction = () => shuffleTeams();
-        window.confirmTeamsAction = () => confirmTeams();
-        window.startDraftSetup = async () => {
-            await updateRoom({ draftSequence: generateDraftSequence(roomData.teamSizeRadiant, roomData.teamSizeDire), stage: 'setup' });
-        };
-        window.generatePoolAction = async () => {
-            let newPool = []; let usedIds = new Set();
-            roomData.nValues.forEach((n, idx) => {
-                const pos = idx + 1;
-                const eligible = HEROES.filter(h => h.positions.includes(pos) && !usedIds.has(h.id));
-                const shuffled = [...eligible].sort(() => 0.5 - Math.random());
-                shuffled.slice(0, n).forEach(s => { usedIds.add(s.id); newPool.push(s); });
-            });
-            await updateRoom({ pool: newPool, stage: 'banning' });
-        };
-        window.resetDraftAction = async () => {
-            await updateRoom({ stage: 'init', bans: [], picksRadiant: [], picksDire: [], pool: [] });
-        };
-        window.handleHeroClick = (id) => handleHeroAction(id);
-
         const render = () => {
             const main = document.getElementById('main-content');
-            const controls = document.getElementById('header-controls');
             const roomDisplay = document.getElementById('room-display');
-
-            if (roomData.id) roomDisplay.innerHTML = `ROOM: <span class="text-amber-500 font-black">${roomData.id}</span> • ${roomData.players.length} PLAYERS`;
-
-            const stageLabels = { entry: 'Вход', lobby: 'Лобби', init: 'Игроки', setup: 'Настройка', banning: 'БАНЫ', picking: 'ПИКИ', result: 'Готово' };
-            const stageClasses = { entry: 'border-slate-800', lobby: 'border-indigo-500/30 text-indigo-400', init: 'border-blue-500/30 text-blue-400', setup: 'border-blue-500/30 text-blue-400', banning: 'border-red-500/30 text-red-400', picking: 'border-green-500/30 text-green-400', result: 'border-amber-500/30 text-amber-400' };
+            const headerControls = document.getElementById('header-controls');
             
-            controls.innerHTML = `
-                ${roomData.id ? `<button onclick="resetDraftAction()" class="flex items-center gap-2 px-6 py-2 bg-slate-800/50 hover:bg-slate-700 rounded-lg text-xs font-black border border-white/5 transition-all"><i data-lucide="refresh-cw" class="w-4 h-4"></i> СБРОС</button>` : ''}
-                <div class="px-5 py-2 rounded-lg border-2 text-[10px] font-black uppercase tracking-widest ${stageClasses[roomData.stage]}">${stageLabels[roomData.stage]}</div>
+            if (roomData.id) roomDisplay.innerHTML = `ROOM: <span class="text-amber-500 font-black">${roomData.id}</span>`;
+
+            headerControls.innerHTML = `
+                <div class="flex items-center gap-3 bg-white/5 p-1 rounded-xl border border-white/5">
+                    ${localUser.photo ? `<img src="${localUser.photo}" class="w-8 h-8 rounded-lg">` : ''}
+                    <span class="text-[10px] font-black uppercase text-slate-400 mr-2">${localUser.name}</span>
+                    <button onclick="logoutAction()" class="p-2 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+                </div>
             `;
 
-            if (roomData.stage === 'entry') renderEntry(main);
+            if (roomData.id === '') renderRoomJoin(main);
             else if (roomData.stage === 'lobby') renderLobby(main);
             else if (roomData.stage === 'init') renderInit(main);
             else if (roomData.stage === 'setup') renderSetup(main);
@@ -466,102 +362,117 @@
             lucide.createIcons();
         };
 
-        const renderEntry = (container) => {
-            container.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in zoom-in duration-500">
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 shadow-2xl w-full max-w-md text-center space-y-8">
-                        <div class="space-y-2"><h2 class="text-3xl font-black text-white uppercase italic tracking-tighter">Вход в систему</h2><p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Введите код лобби и ник</p></div>
-                        <div class="space-y-4">
-                            <input id="nickname-input" placeholder="НИКНЕЙМ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-xl font-black text-center text-white focus:border-amber-500 outline-none transition-all">
-                            <input id="room-code-input" placeholder="КОД КОМНАТЫ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-xl font-black text-center text-white focus:border-amber-500 outline-none transition-all uppercase">
-                        </div>
-                        <button onclick="joinRoomAction()" class="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-2xl font-black text-xl uppercase tracking-widest shadow-xl active:scale-95 transition-all">ВОЙТИ В ЛОББИ</button>
+        const getHeroImg = (h) => h ? `<img src="${CDN_BASE}${h.imgName}.png" class="hero-img" alt="${h.name}">` : '';
+
+        const renderEntry = (c) => {
+            c.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in">
+                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 shadow-2xl w-full max-w-md space-y-8 text-center">
+                        <div class="space-y-2"><h2 class="text-3xl font-black text-white uppercase italic tracking-tighter">Вход</h2><p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Авторизуйтесь через Google</p></div>
+                        <button onclick="loginWithGoogle()" class="google-btn w-full py-5 flex items-center justify-center gap-4 rounded-2xl font-black text-lg uppercase tracking-widest">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.92,19.27 6.23,16.59 6.23,13.32C6.23,10.05 8.92,7.36 12.19,7.36C14.45,7.36 15.74,8.56 15.74,8.56L17.67,6.63C17.67,6.63 15.53,4.64 12.19,4.64C7.34,4.64 3.5,8.53 3.5,13.32C3.5,18.11 7.34,22 12.19,22C17.43,22 21.38,18.33 21.38,13.09C21.38,12.4 21.35,11.1 21.35,11.1V11.1Z"/></svg>
+                            ВИТЯЗЬ GOOGLE
+                        </button>
+                    </div>
+                </div>`;
+            lucide.createIcons();
+        };
+
+        const renderRoomJoin = (c) => {
+            c.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[40vh] animate-in slide-in-from-top">
+                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 shadow-2xl w-full max-w-md space-y-6">
+                        <div class="text-center"><p class="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Привет, ${localUser.name}</p><h2 class="text-2xl font-black text-white uppercase tracking-tighter italic">Войти в комнату</h2></div>
+                        <input id="room-code-input" placeholder="КОД КОМНАТЫ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-xl font-black text-center text-white outline-none focus:border-amber-500 transition-all uppercase tracking-widest">
+                        <button onclick="joinRoomAction()" class="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-2xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest">ПОДКЛЮЧИТЬСЯ</button>
                     </div>
                 </div>`;
         };
 
-        const renderLobby = (container) => {
-            const radiant = roomData.players.filter(p => p.team === 'Radiant');
-            const dire = roomData.players.filter(p => p.team === 'Dire');
-            const unassigned = roomData.players.filter(p => p.team === 'unassigned');
-            container.innerHTML = `
-                <div class="space-y-8 animate-in fade-in duration-700">
-                    <div class="text-center"><h2 class="text-5xl font-black text-white italic tracking-tighter uppercase mb-2">Зал ожидания</h2><p class="text-slate-500 font-bold tracking-[0.3em] uppercase text-[10px]">Команды формируются автоматически</p></div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="team-card p-6 rounded-[2rem] border-t-4 border-t-green-500">
-                            <h3 class="text-xl font-black text-green-500 mb-4 uppercase italic">Radiant (${radiant.length})</h3>
-                            <div class="space-y-2">${radiant.map(p => `<div class="p-3 bg-white/5 rounded-xl font-bold flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-green-500"></div> ${p.name} ${p.uid === localUser.uid ? '<span class="text-[8px] bg-white/10 px-2 py-1 rounded text-slate-400">ВЫ</span>' : ''}</div>`).join('')}</div>
-                        </div>
-                        <div class="flex flex-col gap-4">
-                            <div class="team-card p-6 rounded-[2rem] border-white/10"><h3 class="text-sm font-black text-slate-500 mb-4 uppercase text-center italic tracking-widest">Не распределены</h3><div class="flex flex-wrap gap-2 justify-center">${unassigned.map(p => `<span class="px-4 py-2 bg-slate-800 rounded-full text-xs font-black">${p.name}</span>`).join('')}</div></div>
-                            <button onclick="shuffleAction()" class="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2rem] font-black text-lg flex items-center justify-center gap-3 shadow-xl active:scale-95"><i data-lucide="shuffle"></i> SHUFFLE</button>
-                            <button onclick="confirmTeamsAction()" class="w-full py-4 bg-white hover:bg-slate-200 text-black rounded-[2rem] font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95"><i data-lucide="check"></i> CONFIRM</button>
-                        </div>
-                        <div class="team-card p-6 rounded-[2rem] border-t-4 border-t-red-600">
-                            <h3 class="text-xl font-black text-red-600 mb-4 uppercase italic text-right">Dire (${dire.length})</h3>
-                            <div class="space-y-2">${dire.map(p => `<div class="p-3 bg-white/5 rounded-xl font-bold flex items-center flex-row-reverse gap-3"><div class="w-2 h-2 rounded-full bg-red-600"></div> ${p.name} ${p.uid === localUser.uid ? '<span class="text-[8px] bg-white/10 px-2 py-1 rounded text-slate-400">ВЫ</span>' : ''}</div>`).join('')}</div>
+        const renderLobby = (c) => {
+            const r = roomData.players.filter(p => p.team === 'Radiant');
+            const d = roomData.players.filter(p => p.team === 'Dire');
+            const u = roomData.players.filter(p => p.team === 'unassigned');
+            c.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in">
+                    <div class="team-card p-6 rounded-[2rem] border-t-4 border-t-green-500">
+                        <h3 class="text-xl font-black text-green-500 mb-4 italic">RADIANT (${r.length})</h3>
+                        <div class="space-y-2">${r.map(p => `<div class="p-3 bg-white/5 rounded-xl font-bold flex items-center gap-3">${p.photo ? `<img src="${p.photo}" class="w-5 h-5 rounded">`:''}${p.name}</div>`).join('')}</div>
+                    </div>
+                    <div class="flex flex-col gap-4">
+                        <div class="team-card p-6 rounded-3xl"><h3 class="text-xs font-black text-slate-500 mb-4 uppercase text-center italic">В лобби</h3><div class="flex flex-wrap gap-2 justify-center">${u.map(p => `<span class="px-3 py-1 bg-slate-800 rounded-full text-[10px] font-black">${p.name}</span>`).join('')}</div></div>
+                        <button onclick="shuffleAction()" class="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-lg active:scale-95 transition-all uppercase tracking-widest shadow-xl"><i data-lucide="shuffle" class="inline mr-2"></i> SHUFFLE</button>
+                        <button onclick="confirmTeamsAction()" class="w-full py-4 bg-white text-black rounded-[2rem] font-black text-sm active:scale-95 transition-all uppercase tracking-widest">CONFIRM</button>
+                    </div>
+                    <div class="team-card p-6 rounded-[2rem] border-t-4 border-t-red-600">
+                        <h3 class="text-xl font-black text-red-600 mb-4 italic text-right">DIRE (${d.length})</h3>
+                        <div class="space-y-2">${d.map(p => `<div class="p-3 bg-white/5 rounded-xl font-bold flex items-center flex-row-reverse gap-3 text-right">${p.photo ? `<img src="${p.photo}" class="w-5 h-5 rounded">`:''}${p.name}</div>`).join('')}</div>
+                    </div>
+                </div>`;
+        };
+
+        const renderInit = (c) => {
+            c.innerHTML = `
+                <div class="flex items-center justify-center min-h-[40vh]">
+                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 text-center w-full max-w-md">
+                        <h2 class="text-xl font-black text-white mb-8 uppercase tracking-widest">ИГРОКИ: ${roomData.teamSizeRadiant} VS ${roomData.teamSizeDire}</h2>
+                        <button onclick="startDraftSetup()" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest">ПЕРЕЙТИ К ПУЛУ</button>
+                    </div>
+                </div>`;
+        };
+
+        const renderSetup = (c) => {
+            c.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div class="bg-[#15171e] p-7 rounded-3xl border border-white/5 h-fit shadow-2xl">
+                        <h2 class="text-xs font-black mb-8 text-blue-400 uppercase tracking-widest italic">Настройка Пула</h2>
+                        <div class="space-y-4">${[1,2,3,4,5].map((p,i) => `<div class="flex items-center justify-between"><span class="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Позиция ${p}</span><input type="number" value="${roomData.nValues[i]}" onchange="let v=[...roomData.nValues];v[${i}]=parseInt(this.value);updateRoom({nValues:v})" class="w-16 bg-black/40 rounded-lg p-2 text-center text-white outline-none border border-white/10 font-mono text-xl"></div>`).join('')}</div>
+                        <button onclick="generatePoolAction()" class="w-full mt-10 py-5 bg-blue-600 text-white rounded-2xl font-black text-lg active:scale-95 transition-all uppercase tracking-widest shadow-xl">СГЕНЕРИРОВАТЬ</button>
+                    </div>
+                    <div class="lg:col-span-3 bg-[#15171e] p-8 rounded-3xl border border-white/5 shadow-2xl">
+                        <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-4 opacity-30 grayscale">
+                            ${HEROES.slice(0, 24).map(h => `<div class="hero-img-container rounded-xl border border-white/5">${getHeroImg(h)}</div>`).join('')}
                         </div>
                     </div>
                 </div>`;
         };
 
-        const renderInit = (container) => {
-            container.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in duration-500">
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 shadow-2xl w-full max-w-xl text-center space-y-10">
-                        <h2 class="text-2xl font-black text-white uppercase tracking-widest">Герои на игрока</h2>
-                        <div class="grid grid-cols-2 gap-8">
-                            <div class="space-y-4"><p class="text-xs font-black text-green-500 uppercase tracking-widest">Radiant</p><div class="w-full bg-black/40 border-2 border-green-500/30 rounded-2xl p-6 text-4xl font-black text-white">${roomData.teamSizeRadiant}</div></div>
-                            <div class="space-y-4"><p class="text-xs font-black text-red-500 uppercase tracking-widest">Dire</p><div class="w-full bg-black/40 border-2 border-red-500/30 rounded-2xl p-6 text-4xl font-black text-white">${roomData.teamSizeDire}</div></div>
-                        </div>
-                        <button onclick="startDraftSetup()" class="w-full py-5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-2xl font-black text-xl active:scale-95 transition-all">ПЕРЕЙТИ К ПУЛУ</button>
-                    </div>
-                </div>`;
-        };
-
-        const renderSetup = (container) => {
-            const filtered = HEROES.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()));
-            container.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in duration-700">
-                    <div class="lg:col-span-1 space-y-6">
-                        <div class="bg-[#15171e] p-7 rounded-3xl border border-white/5 shadow-2xl">
-                            <h2 class="text-sm font-black mb-8 flex items-center gap-3 text-blue-400 uppercase tracking-widest"><i data-lucide="layout-grid" class="w-5 h-5"></i> Пул героев</h2>
-                            <div class="space-y-6">${[1, 2, 3, 4, 5].map((pos, i) => `<div class="space-y-2"><div class="flex justify-between text-[11px] font-black text-slate-500 uppercase"><span>Поз. ${pos}</span><span class="text-blue-500/70">${HEROES.filter(h => h.positions.includes(pos)).length}</span></div><input type="number" value="${roomData.nValues[i]}" onchange="let v=[...roomData.nValues];v[${i}]=parseInt(this.value);updateRoom({nValues:v})" class="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-5 py-3 text-2xl font-mono text-white focus:border-blue-500/50 outline-none transition-all"></div>`).join('')}</div>
-                            <button onclick="generatePoolAction()" class="w-full mt-10 py-5 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-2xl font-black text-lg active:scale-95">СГЕНЕРИРОВАТЬ</button>
-                        </div>
-                    </div>
-                    <div class="lg:col-span-3"><div class="bg-[#15171e] p-8 rounded-3xl border border-white/5 min-h-[700px]"><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-7 gap-x-5 gap-y-8">${filtered.map(h => `<div class="group relative"><div class="hero-img-container rounded-xl border-2 border-slate-800/50 shadow-lg">${getHeroImg(h)}</div><div class="mt-2 text-[11px] font-black text-center text-slate-400 truncate group-hover:text-white uppercase tracking-tighter">${h.name}</div></div>`).join('')}</div></div></div>
-                </div>`;
-        };
-
-        const renderDraft = (container) => {
-            const picker = getCurrentPicker();
+        const renderDraft = (c) => {
+            const total = roomData.picksRadiant.length + roomData.picksDire.length;
+            const stepIdx = (() => {
+                let acc=0; for(let i=0; i<roomData.draftSequence.length; i++) {
+                    acc += roomData.draftSequence[i].count; if(total < acc) return i;
+                } return -1;
+            })();
+            const step = roomData.draftSequence[stepIdx];
             const isBanning = roomData.stage === 'banning';
-            const statusColorClass = isBanning ? 'text-shimmer-red' : (picker === 'Radiant' ? 'text-shimmer' : 'text-shimmer-red');
-            const statusLabel = isBanning ? 'БАН' : 'ПИК';
-            container.innerHTML = `
-                <div class="space-y-6 animate-in slide-in-from-bottom-12 duration-700">
+            const picker = isBanning ? (roomData.bans.length % 2 === 0 ? 'Radiant' : 'Dire') : (step ? step.team : null);
+            
+            c.innerHTML = `
+                <div class="space-y-8 animate-in slide-in-from-bottom duration-700">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-                        <div class="p-8 rounded-[2.5rem] border-4 transition-all duration-700 ${picker === 'Radiant' ? 'bg-green-500/5 border-green-500' : 'bg-[#15171e] border-white/5'}">
-                            <h3 class="text-3xl font-black text-green-500 italic mb-8 uppercase">RADIANT</h3>
-                            <div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeRadiant)].map((_, i) => `<div class="hero-img-container rounded-xl bg-black/50 border-2 border-white/5">${roomData.picksRadiant[i] ? getHeroImg(roomData.picksRadiant[i]) : ''}</div>`).join('')}</div>
+                        <div class="team-card p-6 rounded-[2.5rem] border-4 transition-all duration-700 ${picker==='Radiant'?'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]':'border-transparent'}">
+                            <h3 class="text-3xl font-black text-green-500 mb-6 italic tracking-tighter uppercase">RADIANT</h3>
+                            <div class="grid grid-cols-5 gap-2">${[...Array(roomData.teamSizeRadiant)].map((_,i) => `<div class="hero-img-container rounded-xl bg-black/50 border-2 border-white/5">${getHeroImg(roomData.picksRadiant[i])}</div>`).join('')}</div>
                         </div>
-                        <div class="flex flex-col gap-6 text-center">
-                            <div class="bg-[#1a1d26] p-8 py-12 rounded-[2.5rem] border-2 border-white/10">
-                                ${roomData.stage === 'result' ? `<div class="text-amber-500 font-black text-7xl uppercase animate-pulse">БИТВА!</div>` : `<div class="text-8xl font-black ${statusColorClass}">${statusLabel}</div><div class="text-4xl font-black ${picker === 'Radiant' ? 'text-green-500' : 'text-red-600'}">${picker === 'Radiant' ? 'RADIANT' : 'DIRE'}</div>`}
-                            </div>
-                            <div class="bg-[#15171e] p-6 rounded-[2rem] border border-white/5"><div class="flex justify-center gap-3">${[0, 1, 2, 3].map(i => `<div class="w-14 h-20 bg-black/60 rounded-xl overflow-hidden grayscale">${roomData.bans[i] ? getHeroImg(roomData.bans[i]) : ''}</div>`).join('')}</div></div>
+                        <div class="bg-[#1a1d26] p-8 rounded-[2.5rem] border-2 border-white/10 text-center shadow-2xl">
+                            ${roomData.stage==='result' ? `<div class="text-amber-500 font-black text-7xl italic animate-pulse">БИТВА!</div>` : `<div class="text-7xl font-black italic tracking-tighter ${isBanning?'text-shimmer-red':'text-white'}">${isBanning?'БАН':'ПИК'}</div><div class="text-2xl font-black mt-2 tracking-widest ${picker==='Radiant'?'text-green-500':'text-red-600'}">${picker?picker.toUpperCase():''}</div>`}
+                            <div class="flex justify-center gap-2 mt-8">${[0,1,2,3].map(i => `<div class="w-12 h-16 bg-black rounded-xl overflow-hidden grayscale opacity-50 border-2 border-red-900/20">${getHeroImg(roomData.bans[i])}</div>`).join('')}</div>
                         </div>
-                        <div class="p-8 rounded-[2.5rem] border-4 transition-all duration-700 ${picker === 'Dire' ? 'bg-red-500/5 border-red-600' : 'bg-[#15171e] border-white/5'}">
-                            <h3 class="text-3xl font-black text-red-600 italic mb-8 uppercase text-right">DIRE</h3>
-                            <div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeDire)].map((_, i) => `<div class="hero-img-container rounded-xl bg-black/50 border-2 border-white/5">${roomData.picksDire[i] ? getHeroImg(roomData.picksDire[i]) : ''}</div>`).join('')}</div>
+                        <div class="team-card p-6 rounded-[2.5rem] border-4 transition-all duration-700 ${picker==='Dire'?'border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.1)]':'border-transparent'}">
+                            <h3 class="text-3xl font-black text-red-600 mb-6 italic tracking-tighter uppercase text-right">DIRE</h3>
+                            <div class="grid grid-cols-5 gap-2">${[...Array(roomData.teamSizeDire)].map((_,i) => `<div class="hero-img-container rounded-xl bg-black/50 border-2 border-white/5 flex-row-reverse">${getHeroImg(roomData.picksDire[i])}</div>`).join('')}</div>
                         </div>
                     </div>
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/5"><div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-x-5 gap-y-10">${roomData.pool.map(h => {
-                        const isBanned = roomData.bans.find(b => b.id === h.id);
-                        const isPicked = roomData.picksRadiant.find(p => p.id === h.id) || roomData.picksDire.find(p => p.id === h.id);
-                        return `<div onclick="handleHeroClick(${h.id})" class="group relative cursor-pointer ${isBanned ? 'opacity-20 grayscale' : isPicked ? 'opacity-5' : ''}"><div class="hero-img-container rounded-xl border-2 ${!isBanned && !isPicked ? 'border-slate-700 hover:border-amber-400' : 'border-transparent'}">${getHeroImg(h)}</div><div class="mt-2 text-[10px] font-black text-center text-slate-400 uppercase">${h.name}</div></div>`;
-                    }).join('')}</div></div>
+                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/5 shadow-2xl">
+                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-4">
+                            ${roomData.pool.map(h => {
+                                const isB = roomData.bans.find(x=>x.id===h.id);
+                                const isP = [...roomData.picksRadiant, ...roomData.picksDire].find(x=>x.id===h.id);
+                                return `<div onclick="handleHeroClick(${h.id})" class="hero-img-container rounded-xl border-2 cursor-pointer transition-all duration-300 ${isB?'opacity-10 grayscale':isP?'opacity-5':'border-slate-800 hover:border-amber-500 hover:scale-105 shadow-xl'}">${getHeroImg(h)}</div>`;
+                            }).join('')}
+                        </div>
+                    </div>
                 </div>`;
         };
 
