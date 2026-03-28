@@ -77,7 +77,15 @@
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        const manualConfig = { apiKey: "", authDomain: "project-578-032.firebaseapp.com", projectId: "project-578-032", storageBucket: "project-578-032.firebasestorage.app", messagingSenderId: "599943765176", appId: "1:599943765176:web:321689096ad8c008fe284d" };
+        // Fallback configuration for GitHub Pages/External environments
+        const manualConfig = { 
+            apiKey: "AIzaSyBOv8Tf0Z-XnSp3DUHstPo7FZyb1SPuAgA", 
+            authDomain: "project-578-032.firebaseapp.com", 
+            projectId: "project-578-032", 
+            storageBucket: "project-578-032.firebasestorage.app", 
+            messagingSenderId: "599943765176", 
+            appId: "1:599943765176:web:321689096ad8c008fe284d" 
+        };
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
         const appId = "dota-drafter-pro-v8"; 
 
@@ -485,16 +493,14 @@
                     const bots = teamMembers.filter(p => p.uid.startsWith('bot') && !roomData.votes[p.uid]);
                     if (bots.length > 0) botActionTimeout = setTimeout(async () => {
                         const botUid = bots[0].uid;
-                        const sameTeamVotes = Object.entries(roomData.votes).filter(([uid]) => roomData.players.find(p => p.uid === uid)?.team === roomData.currentTurnTeam).map(([, hid]) => hid);
-                        
+                        const teamVotes = Object.entries(roomData.votes).filter(([uid]) => roomData.players.find(p => p.uid === uid)?.team === roomData.currentTurnTeam).map(([, hid]) => hid);
                         let chosenId;
-                        if (sameTeamVotes.length > 0 && Math.random() < 0.4) {
-                            chosenId = sameTeamVotes[Math.floor(Math.random() * sameTeamVotes.length)];
+                        if (teamVotes.length > 0 && Math.random() < 0.4) {
+                            chosenId = teamVotes[Math.floor(Math.random() * teamVotes.length)];
                         } else {
-                            const avail = roomData.pool.filter(x => !roomData.bans.find(b=>b.id===x.id) && !sameTeamVotes.includes(x.id));
+                            const avail = roomData.pool.filter(x => !roomData.bans.find(b=>b.id===x.id) && !teamVotes.includes(x.id));
                             chosenId = (avail.length > 0 ? avail : roomData.pool)[Math.floor(Math.random() * Math.min(avail.length || 1, 5))].id;
                         }
-                        
                         await updateRoom({ votes: { ...roomData.votes, [botUid]: chosenId } });
                         botActionTimeout = null;
                     }, 2000 + Math.random() * 2000);
