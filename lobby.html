@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Drafter (v8.18)</title>
+    <title>Dota 2 Drafter (v8.19)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -62,7 +62,7 @@
                     </div>
                     <div>
                         <h1 class="text-3xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">DOTA 2 DRAFTER</h1>
-                        <p id="room-display" class="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO EDITION v8.18</p>
+                        <p id="room-display" class="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO EDITION v8.19</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3" id="header-controls"></div>
@@ -77,7 +77,7 @@
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Fallback configuration for GitHub Pages/External environments
+        // Fallback configuration for external environments
         const manualConfig = { 
             apiKey: "AIzaSyBOv8Tf0Z-XnSp3DUHstPo7FZyb1SPuAgA", 
             authDomain: "project-578-032.firebaseapp.com", 
@@ -131,21 +131,26 @@
             return [{ name: "Professional", seq: gen([1, 2, 2, 2, 1]) }, { name: "Tournament (1-by-1)", seq: gen([1, 1]) }];
         }
         function getTurnDuration(type) { 
-            if (type === 'picking') {
-                return roomData.infinitePickTime ? 999999999 : (roomData.pickDuration * 1000);
-            }
+            if (type === 'picking') return roomData.infinitePickTime ? 999999999 : (roomData.pickDuration * 1000);
             return 15000; 
         }
         function getHeroImg(h) { return h ? `<img src="${CDN_BASE}${h.imgName}.png" class="hero-img" alt="${h.name}" draggable="false">` : ''; }
         function isAdmin() { return roomData.hostUid && roomData.hostUid === localUser.uid; }
+        
         function getCurrentPickPlayer() {
-            const total = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+            const totalPicks = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+            const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
+            if (totalPicks >= totalExpected) return null;
+            
             let acc = 0;
-            for(let step of roomData.draftSequence) { acc += step.count; if(total < acc) {
-                const teamPlayers = roomData.players.filter(p => p.team === step.team).sort((a,b) => a.slot - b.slot);
-                const playerIndex = (step.team === 'Radiant' ? roomData.picksRadiant.length : roomData.picksDire.length);
-                return teamPlayers[playerIndex];
-            }} return null;
+            for(let step of roomData.draftSequence) { 
+                acc += step.count; 
+                if(totalPicks < acc) {
+                    const teamPlayers = roomData.players.filter(p => p.team === step.team).sort((a,b) => a.slot - b.slot);
+                    const playerIndex = (step.team === 'Radiant' ? roomData.picksRadiant.length : roomData.picksDire.length);
+                    return teamPlayers[playerIndex] || null;
+                }
+            } return null;
         }
 
         const updateRoom = async (u) => { 
@@ -158,11 +163,13 @@
         const finalizeTurn = async () => {
             if (!isAdmin()) return;
             if (botActionTimeout) { clearTimeout(botActionTimeout); botActionTimeout = null; }
+            
             if (roomData.stage === 'banning') {
                 const teamVotes = Object.entries(roomData.votes || {}).filter(([uid]) => {
                     const p = roomData.players.find(x => x.uid === uid);
                     return p && p.team === roomData.currentTurnTeam;
                 }).map(([, hid]) => hid);
+                
                 let winnerId = null;
                 if (teamVotes.length === 0) {
                     const avail = roomData.pool.filter(h => !roomData.bans.find(b=>b.id===h.id));
@@ -172,17 +179,21 @@
                     const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
                     winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
                 }
-                const newBans = [...roomData.bans, { ...roomData.pool.find(h => h.id === winnerId), team: roomData.currentTurnTeam }];
+                const newBans = [...(roomData.bans || []), { ...roomData.pool.find(h => h.id === winnerId), team: roomData.currentTurnTeam }];
                 const rBMade = newBans.filter(b => b.team === 'Radiant').length, dBMade = newBans.filter(b => b.team === 'Dire').length;
-                if (rBMade >= roomData.bansRadiant && dBMade >= roomData.bansDire) await updateRoom({ bans: newBans, stage: 'picking', timerEnd: Date.now() + getTurnDuration('picking'), isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null });
-                else {
+                
+                if (rBMade >= roomData.bansRadiant && dBMade >= roomData.bansDire) {
+                    await updateRoom({ bans: newBans, stage: 'picking', timerEnd: Date.now() + getTurnDuration('picking'), isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null });
+                } else {
                     let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (newBans.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
                     await updateRoom({ bans: newBans, currentTurnTeam: nextT, timerEnd: Date.now() + getTurnDuration('banning'), isExtraTime: false, votes: {} });
                 }
             } else if (roomData.stage === 'picking') {
                 const total = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
-                if (total >= (roomData.teamSizeRadiant + roomData.teamSizeDire)) await updateRoom({ stage: 'result' });
-                else {
+                const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
+                if (total >= totalExpected) {
+                    await updateRoom({ stage: 'result' });
+                } else {
                     let acc = 0, nextTeam = 'Radiant';
                     for(let step of roomData.draftSequence) { acc += step.count; if(total < acc) { nextTeam = step.team; break; } }
                     await updateRoom({ currentTurnTeam: nextTeam, timerEnd: Date.now() + getTurnDuration('picking'), isExtraTime: false, pendingHeroId: null });
@@ -213,8 +224,10 @@
         };
         
         window.confirmPickAction = async () => {
-            const turnP = getCurrentPickPlayer(); if (!turnP || !roomData.pendingHeroId || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
-            const h = roomData.pool.find(x => x.id === roomData.pendingHeroId);
+            const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
+            const hId = roomData.pendingHeroId;
+            const h = roomData.pool.find(x => x.id === hId);
+            if (!h) return;
             if (roomData.currentTurnTeam === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), h] });
             else await updateRoom({ picksDire: [...(roomData.picksDire||[]), h] });
             if(isAdmin()) finalizeTurn();
@@ -287,8 +300,8 @@
                             
                             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                                 <div>
-                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2">Pick Timer (sec)</h3>
-                                    <div class="flex items-center gap-3">
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 text-center">Pick Timer (sec)</h3>
+                                    <div class="flex items-center justify-center gap-3">
                                         <input type="number" value="${roomData.pickDuration}" onchange="updateField('pickDuration', parseInt(this.value))" class="bg-black/50 border border-white/10 rounded-xl p-2 w-20 text-center font-black" ${roomData.infinitePickTime ? 'disabled' : ''}>
                                         <label class="flex items-center gap-2 cursor-pointer opacity-80 hover:opacity-100">
                                             <input type="checkbox" ${roomData.infinitePickTime ? 'checked' : ''} onchange="updateField('infinitePickTime', this.checked)" class="w-4 h-4">
@@ -297,7 +310,7 @@
                                     </div>
                                 </div>
                                 <div class="flex flex-col items-center">
-                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2">Bans (R / D)</h3>
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2">Bans Setting</h3>
                                     <div class="flex items-center gap-3">
                                         <div class="flex flex-col items-center">
                                             <span class="text-[7px] font-black text-green-500 uppercase mb-1">Radiant</span>
@@ -424,11 +437,17 @@
                         </div><div class="team-card p-8 rounded-[3rem] border-4 transition-all duration-700 ${roomData.currentTurnTeam==='Dire'?'border-red-600':'border-transparent'}"><h3 class="text-2xl font-black text-red-600 mb-6 italic text-right uppercase text-center">DIRE</h3><div class="grid grid-cols-5 gap-3">${renderSlots('Dire', roomData.picksDire, roomData.teamSizeDire)}</div></div></div>
                     <div class="bg-[#15171e] p-8 rounded-[4rem] border border-white/5 shadow-2xl relative"><div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-x-6 gap-y-10">${sortedPool.map((h, idx) => {
                         const isBan = roomData.bans.find(x=>x.id===h.id), isPick = [...(roomData.picksRadiant||[]), ...(roomData.picksDire||[])].find(x=>x.id===h.id);
+                        
+                        // Scale BAN text for everyone to see based on the currently banning team's votes
+                        const activeTeamPlayers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
+                        const vCount = activeTeamPlayers.filter(p => roomData.votes[p.uid] === h.id).length;
+                        const bSize = 8 + (vCount * 4); 
+                        
                         const myV = roomData.votes[localUser.uid] === h.id, teamV = roomData.players.filter(p => p.team === myT && roomData.votes[p.uid] === h.id);
                         const oppV = Object.entries(roomData.votes || {}).some(([uid, hid]) => { const vP = roomData.players.find(p => p.uid === uid); return vP && vP.team !== myT && hid === h.id; });
                         const pend = roomData.pendingHeroId === h.id;
                         const anim = !poolAnimationPlayed, del = sortedPool.length > 0 ? (5 / sortedPool.length) : 0;
-                        const vCount = teamV.length; const bSize = 8 + (vCount * 3); 
+                        
                         return `<div onclick="handleHeroClick(${h.id})" class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 cursor-pointer" style="${anim ? `animation-delay: ${idx * del}s` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && (vCount > 0 || oppV) ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan?'hero-banned-fx':isPick?'hero-picked-fx':''}">
                             ${getHeroImg(h)}${isB && (vCount > 0 || oppV) ? `<div class="absolute inset-0 bg-red-600/10 flex items-center justify-center pointer-events-none"><span class="text-white font-black uppercase bg-red-600 px-1.5 rounded -rotate-12 shadow-lg" style="font-size: ${bSize}px">BAN</span></div>` : ''}${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-1.5 rounded">PICK</span></div>` : ''}
                             <div class="absolute top-1 right-1 flex flex-wrap-reverse gap-0.5 justify-end">${teamV.map(v => `<img src="${v.photo}" class="w-4 h-4 rounded-sm border border-white/50 bg-black shadow-md">`).join('')}</div></div><span class="text-[8px] font-black uppercase text-slate-600 group-hover:text-white truncate w-full text-center">${h.name}</span></div>`;
