@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Drafter (v8.21)</title>
+    <title>Dota 2 Drafter (v8.20 Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -62,7 +62,7 @@
                     </div>
                     <div>
                         <h1 class="text-3xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">DOTA 2 DRAFTER</h1>
-                        <p id="room-display" class="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO EDITION v8.21</p>
+                        <p id="room-display" class="text-[10px] text-slate-500 font-bold tracking-[0.3em] uppercase opacity-80">PRO EDITION v8.20</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3" id="header-controls"></div>
@@ -106,7 +106,7 @@
             pickDuration: 20, infinitePickTime: false
         };
         let isLocalMode = false;
-        let poolAnimationPlayed = true; // Default to true, reset only on init
+        let poolAnimationPlayed = true; 
         let botActionTimeout = null;
         let tagManagerScrollTop = 0;
 
@@ -146,7 +146,7 @@
                 acc += step.count; 
                 if(totalPicks < acc) {
                     const teamPlayers = roomData.players.filter(p => p.team === step.team).sort((a,b) => a.slot - b.slot);
-                    const playerIndex = (step.team === 'Radiant' ? roomData.picksRadiant.length : roomData.picksDire.length);
+                    const playerIndex = (step.team === 'Radiant' ? (roomData.picksRadiant?.length || 0) : (roomData.picksDire?.length || 0));
                     return teamPlayers[playerIndex] || null;
                 }
             } return null;
@@ -187,6 +187,7 @@
                     let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (newBans.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
                     await updateRoom({ bans: newBans, currentTurnTeam: nextT, timerEnd: Date.now() + getTurnDuration('banning'), isExtraTime: false, votes: {} });
                 }
+
             } else if (roomData.stage === 'picking') {
                 const total = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
                 const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
@@ -215,21 +216,8 @@
         
         window.startOverAction = async () => { 
             if (!isAdmin()) return; 
-            // Reset state while keeping participants and their UID
             const resetPlayers = roomData.players.map(p => ({ ...p, team: 'unassigned', slot: -1 }));
-            const resetData = {
-                stage: 'lobby',
-                players: resetPlayers,
-                pool: [],
-                bans: [],
-                picksRadiant: [],
-                picksDire: [],
-                votes: {},
-                pendingHeroId: null,
-                isExtraTime: false,
-                timerEnd: 0
-            };
-            await updateRoom(resetData);
+            await updateRoom({ stage: 'lobby', players: resetPlayers, pool: [], bans: [], picksRadiant: [], picksDire: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerEnd: 0 });
         };
 
         window.startDraftSetup = async () => { if (!isAdmin()) return; updateRoom({ stage: 'setup' }); };
@@ -238,7 +226,6 @@
             if (!isAdmin()) return;
             let pl = []; let used = new Set(); const excluded = new Set(roomData.excludedHeroIds || []);
             roomData.nValues.forEach((n, i) => { const pos = i + 1; HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excluded.has(h.id)).sort(() => 0.5 - Math.random()).slice(0, n).forEach(h => { used.add(h.id); pl.push(h); }); });
-            poolAnimationPlayed = false; // Trigger animation for the NEW list
             updateRoom({ pool: pl, stage: 'banning', bans: [], picksRadiant: [], picksDire: [], timerEnd: Date.now() + getTurnDuration('banning') + ANIM_DELAY, isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant' });
         };
         
@@ -308,7 +295,6 @@
             const totalPool = roomData.nValues.reduce((a, b) => a + b, 0);
             const neededHeroes = totalPlayers + totalBans;
             const isValid = totalPool >= neededHeroes;
-
             const strats = getStrategies(rPlayers, dPlayers); 
             const host = isAdmin();
             c.innerHTML = `<div class="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
@@ -378,13 +364,7 @@
                     </div>
                 </div>
                 <div class="text-center pt-8">
-                    ${host ? `
-                        <button onclick="confirmTeamsAction()" 
-                            class="px-20 py-5 bg-green-500 text-black rounded-3xl font-black uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
-                            ${!isValid ? 'disabled' : ''}>
-                            Generate Heroes List
-                        </button>
-                    ` : `<p class="animate-pulse font-black text-slate-500 uppercase">Wait for host...</p>`}
+                    ${host ? `<button onclick="confirmTeamsAction()" class="px-20 py-5 bg-green-500 text-black rounded-3xl font-black uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" ${!isValid ? 'disabled' : ''}>Generate Heroes List</button>` : `<p class="animate-pulse font-black text-slate-500 uppercase">Wait for host...</p>`}
                 </div>
             </div>`;
             lucide.createIcons();
@@ -497,32 +477,8 @@
             const extraDur = 10000;
             const currentTurnMax = roomData.isExtraTime ? extraDur : baseDur;
 
-            if (roomData.infinitePickTime && roomData.stage === 'picking') {
-                 if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = "--";
-                 const progress = document.getElementById('timer-progress');
-                 if (progress) progress.style.strokeDashoffset = 0;
-                 return;
-            }
-
             const teamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
             const allInTeamVotedForBan = roomData.stage === 'banning' && (teamMembers.length > 0 && teamMembers.every(p => roomData.votes[p.uid]));
-
-            if (roomData.stage === 'banning') {
-                const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
-                const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
-                if (allVotedSame) {
-                    const delta = 250; if (isAdmin()) updateRoom({ timerEnd: roomData.timerEnd - delta });
-                    rawLeft -= delta;
-                }
-            }
-
-            const leftSec = Math.ceil(rawLeft / 1000);
-            if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = leftSec;
-            const progress = document.getElementById('timer-progress');
-            if (progress) {
-                const ratio = Math.min(1, rawLeft / currentTurnMax);
-                progress.style.strokeDashoffset = 283 - (283 * ratio);
-            }
 
             if (isAdmin() && !botActionTimeout) {
                 if (roomData.stage === 'banning') {
@@ -542,8 +498,34 @@
                     }, 2000 + Math.random() * 2000);
                 } else if (roomData.stage === 'picking') {
                     const turnP = getCurrentPickPlayer();
-                    if (turnP?.uid.startsWith('bot')) botActionTimeout = setTimeout(() => { randomPickAction(); botActionTimeout = null; }, 2500);
+                    if (turnP?.uid.startsWith('bot')) {
+                        botActionTimeout = setTimeout(() => { randomPickAction(); botActionTimeout = null; }, 2500);
+                    }
                 }
+            }
+
+            if (roomData.infinitePickTime && roomData.stage === 'picking') {
+                 if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = "--";
+                 const progress = document.getElementById('timer-progress');
+                 if (progress) progress.style.strokeDashoffset = 0;
+                 return;
+            }
+
+            if (roomData.stage === 'banning') {
+                const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
+                const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
+                if (allVotedSame) {
+                    const delta = 250; if (isAdmin()) updateRoom({ timerEnd: roomData.timerEnd - delta });
+                    rawLeft -= delta;
+                }
+            }
+
+            const leftSec = Math.ceil(rawLeft / 1000);
+            if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = leftSec;
+            const progress = document.getElementById('timer-progress');
+            if (progress) {
+                const ratio = Math.min(1, rawLeft / currentTurnMax);
+                progress.style.strokeDashoffset = 283 - (283 * ratio);
             }
 
             if (leftSec <= 0 && isAdmin()) {
@@ -577,7 +559,6 @@
                         const newData = d.data();
                         const oldStage = roomData.stage;
                         roomData = newData;
-                        // Animation flag logic: reset only when transitioning setup -> init
                         if (oldStage === 'setup' && roomData.stage === 'init') {
                             poolAnimationPlayed = false;
                         }
