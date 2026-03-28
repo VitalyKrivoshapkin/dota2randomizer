@@ -72,7 +72,6 @@
         let localUser = { name: '', uid: '', photo: '' };
         let roomData = { id: '', stage: 'entry', players: [] };
 
-        // Данные героев (сокращено для краткости, используйте полный список из прошлых версий)
         const HEROES = [
             { id: 1, name: "Abaddon", imgName: "abaddon", positions: [3, 5] },
             { id: 2, name: "Alchemist", imgName: "alchemist", positions: [1, 2] },
@@ -204,7 +203,7 @@
 
         const showError = (msg) => {
             const main = document.getElementById('main-content');
-            main.innerHTML = `<div class="p-8 text-center bg-red-500/10 border-2 border-red-500/20 rounded-3xl"><h2 class="text-xl font-black mb-2 uppercase">Ошибка</h2><p class="text-slate-400 mb-6">${msg}</p><button onclick="window.location.reload()" class="px-6 py-2 bg-red-600 rounded-lg font-black uppercase text-xs">Обновить</button></div>`;
+            main.innerHTML = `<div class="p-8 text-center bg-red-500/10 border-2 border-red-500/20 rounded-3xl"><h2 class="text-xl font-black mb-2 uppercase text-red-500">Ошибка</h2><p class="text-slate-400 mb-6">${msg}</p><button onclick="window.location.reload()" class="px-6 py-2 bg-red-600 rounded-lg font-black uppercase text-xs">Обновить страницу</button></div>`;
             lucide.createIcons();
         };
 
@@ -226,7 +225,7 @@
                 await signInWithPopup(auth, provider);
             } catch (e) {
                 console.error(e);
-                alert("Ошибка входа Google. Убедитесь, что вы включили Google Auth в консоли Firebase.");
+                showError("Ошибка входа через Google. Убедитесь, что метод входа Google включен в Firebase Authentication.");
             }
         };
 
@@ -261,9 +260,13 @@
                         roomData = doc.data();
                         render();
                     }
+                }, (err) => {
+                    console.error(err);
+                    showError("Ошибка доступа. Проверьте Security Rules в консоли Firebase (Firestore Database -> Rules).");
                 });
             } catch (e) {
-                showError("Ошибка доступа. Проверьте Firestore Rules в консоли Firebase.");
+                console.error(e);
+                showError("Ошибка при входе в комнату. Проверьте Security Rules в консоли Firebase.");
             }
         };
 
@@ -275,20 +278,24 @@
 
         // --- UI ACTIONS ---
         window.joinRoomAction = () => {
-            const code = document.getElementById('room-code-input').value.toUpperCase();
-            joinRoom(code);
+            const codeInput = document.getElementById('room-code-input');
+            const code = codeInput.value.trim().toUpperCase();
+            if (code) joinRoom(code);
         };
+
         window.shuffleAction = () => {
             let p = [...roomData.players];
             p.sort(() => Math.random() - 0.5);
             p.forEach((player, i) => player.team = i < p.length/2 ? 'Radiant' : 'Dire');
             updateRoom({ players: p });
         };
+
         window.confirmTeamsAction = () => {
             const r = roomData.players.filter(x => x.team === 'Radiant').length;
             const d = roomData.players.filter(x => x.team === 'Dire').length;
             updateRoom({ stage: 'init', teamSizeRadiant: r || 5, teamSizeDire: d || 5 });
         };
+
         window.startDraftSetup = () => {
             const seq = [];
             let ra=0, da=0, ct='Radiant', rc=roomData.teamSizeRadiant, dc=roomData.teamSizeDire;
@@ -299,6 +306,7 @@
             }
             updateRoom({ draftSequence: seq, stage: 'setup' });
         };
+
         window.generatePoolAction = () => {
             let pool = []; let used = new Set();
             roomData.nValues.forEach((n, i) => {
@@ -309,6 +317,7 @@
             });
             updateRoom({ pool, stage: 'banning' });
         };
+
         window.handleHeroClick = (id) => {
             const h = roomData.pool.find(x => x.id === id);
             if (!h) return;
@@ -347,10 +356,13 @@
             if (roomData.id) roomDisplay.innerHTML = `ROOM: <span class="text-amber-500 font-black">${roomData.id}</span>`;
 
             headerControls.innerHTML = `
-                <div class="flex items-center gap-3 bg-white/5 p-1 rounded-xl border border-white/5">
+                <div class="flex items-center gap-3 bg-white/5 p-1.5 rounded-xl border border-white/5">
                     ${localUser.photo ? `<img src="${localUser.photo}" class="w-8 h-8 rounded-lg">` : ''}
-                    <span class="text-[10px] font-black uppercase text-slate-400 mr-2">${localUser.name}</span>
-                    <button onclick="logoutAction()" class="p-2 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+                    <div class="flex flex-col">
+                        <span class="text-[9px] font-black uppercase text-slate-300 leading-none">${localUser.name}</span>
+                        <span class="text-[7px] font-bold uppercase text-slate-600 leading-none mt-1">Authorized</span>
+                    </div>
+                    <button onclick="logoutAction()" class="p-2 text-slate-500 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-3.5 h-3.5"></i></button>
                 </div>
             `;
 
@@ -366,25 +378,30 @@
 
         const renderEntry = (c) => {
             c.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in">
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 shadow-2xl w-full max-w-md space-y-8 text-center">
-                        <div class="space-y-2"><h2 class="text-3xl font-black text-white uppercase italic tracking-tighter">Вход</h2><p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Авторизуйтесь через Google</p></div>
-                        <button onclick="loginWithGoogle()" class="google-btn w-full py-5 flex items-center justify-center gap-4 rounded-2xl font-black text-lg uppercase tracking-widest">
-                            <svg class="w-6 h-6" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.92,19.27 6.23,16.59 6.23,13.32C6.23,10.05 8.92,7.36 12.19,7.36C14.45,7.36 15.74,8.56 15.74,8.56L17.67,6.63C17.67,6.63 15.53,4.64 12.19,4.64C7.34,4.64 3.5,8.53 3.5,13.32C3.5,18.11 7.34,22 12.19,22C17.43,22 21.38,18.33 21.38,13.09C21.38,12.4 21.35,11.1 21.35,11.1V11.1Z"/></svg>
-                            ВИТЯЗЬ GOOGLE
+                <div class="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in duration-500">
+                    <div class="bg-[#15171e] p-12 rounded-[3.5rem] border border-white/10 shadow-2xl w-full max-w-md space-y-10 text-center">
+                        <div class="space-y-3">
+                            <h2 class="text-4xl font-black text-white uppercase italic tracking-tighter">Вход</h2>
+                            <p class="text-slate-500 text-xs font-bold uppercase tracking-[0.2em]">Авторизуйтесь через Google</p>
+                        </div>
+                        <button onclick="loginWithGoogle()" class="google-btn w-full py-5 flex items-center justify-center gap-4 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12V14.26H17.92C17.67,15.63 16.9,16.79 15.74,17.57V20.33H19.28C21.36,18.42 22.56,15.6 22.56,12.25Z"/><path fill="#34A853" d="M12,23C14.97,23 17.46,22.02 19.28,20.33L15.74,17.57C14.77,18.23 13.49,18.63 12,18.63C9.13,18.63 6.7,16.69 5.83,14.07H2.18V16.9C4,20.51 7.71,23 12,23Z"/><path fill="#FBBC05" d="M5.83,14.07C5.61,13.4 5.48,12.71 5.48,12C5.48,11.29 5.61,10.6 5.83,9.93V7.09H2.18C1.43,8.55 1,10.22 1,12C1,13.78 1.43,15.45 2.18,16.9L5.83,14.07Z"/><path fill="#EA4335" d="M12,5.38C13.62,5.38 15.06,5.94 16.21,7.03L19.35,3.89C17.45,2.12 14.97,1 12,1C7.71,1 4,3.49 2.18,7.09L5.83,9.93C6.7,7.31 9.13,5.38 12,5.38Z"/></svg>
+                            ВХОД ЧЕРЕЗ GOOGLE
                         </button>
                     </div>
                 </div>`;
-            lucide.createIcons();
         };
 
         const renderRoomJoin = (c) => {
             c.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-[40vh] animate-in slide-in-from-top">
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 shadow-2xl w-full max-w-md space-y-6">
-                        <div class="text-center"><p class="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Привет, ${localUser.name}</p><h2 class="text-2xl font-black text-white uppercase tracking-tighter italic">Войти в комнату</h2></div>
-                        <input id="room-code-input" placeholder="КОД КОМНАТЫ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-xl font-black text-center text-white outline-none focus:border-amber-500 transition-all uppercase tracking-widest">
-                        <button onclick="joinRoomAction()" class="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-2xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest">ПОДКЛЮЧИТЬСЯ</button>
+                <div class="flex flex-col items-center justify-center min-h-[40vh] animate-in slide-in-from-top duration-500">
+                    <div class="bg-[#15171e] p-12 rounded-[3.5rem] border border-white/10 shadow-2xl w-full max-w-md space-y-8">
+                        <div class="text-center">
+                            <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2 italic">Привет, ${localUser.name}</p>
+                            <h2 class="text-3xl font-black text-white uppercase tracking-tighter italic">Войти в комнату</h2>
+                        </div>
+                        <input id="room-code-input" placeholder="КОД КОМНАТЫ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-2xl font-black text-center text-white outline-none focus:border-amber-500 transition-all uppercase tracking-[0.3em]">
+                        <button onclick="joinRoomAction()" class="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-2xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest shadow-xl">ПОДКЛЮЧИТЬСЯ</button>
                     </div>
                 </div>`;
         };
@@ -394,44 +411,57 @@
             const d = roomData.players.filter(p => p.team === 'Dire');
             const u = roomData.players.filter(p => p.team === 'unassigned');
             c.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in">
-                    <div class="team-card p-6 rounded-[2rem] border-t-4 border-t-green-500">
-                        <h3 class="text-xl font-black text-green-500 mb-4 italic">RADIANT (${r.length})</h3>
-                        <div class="space-y-2">${r.map(p => `<div class="p-3 bg-white/5 rounded-xl font-bold flex items-center gap-3">${p.photo ? `<img src="${p.photo}" class="w-5 h-5 rounded">`:''}${p.name}</div>`).join('')}</div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-700">
+                    <div class="team-card p-8 rounded-[3rem] border-t-8 border-t-green-500/80">
+                        <h3 class="text-2xl font-black text-green-500 mb-6 italic uppercase tracking-tighter">RADIANT (${r.length})</h3>
+                        <div class="space-y-3">${r.map(p => `<div class="p-3.5 bg-white/5 rounded-2xl font-bold flex items-center gap-3">${p.photo ? `<img src="${p.photo}" class="w-6 h-6 rounded-lg shadow">`:''}${p.name}</div>`).join('')}</div>
                     </div>
-                    <div class="flex flex-col gap-4">
-                        <div class="team-card p-6 rounded-3xl"><h3 class="text-xs font-black text-slate-500 mb-4 uppercase text-center italic">В лобби</h3><div class="flex flex-wrap gap-2 justify-center">${u.map(p => `<span class="px-3 py-1 bg-slate-800 rounded-full text-[10px] font-black">${p.name}</span>`).join('')}</div></div>
-                        <button onclick="shuffleAction()" class="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-lg active:scale-95 transition-all uppercase tracking-widest shadow-xl"><i data-lucide="shuffle" class="inline mr-2"></i> SHUFFLE</button>
-                        <button onclick="confirmTeamsAction()" class="w-full py-4 bg-white text-black rounded-[2rem] font-black text-sm active:scale-95 transition-all uppercase tracking-widest">CONFIRM</button>
+                    <div class="flex flex-col gap-6">
+                        <div class="team-card p-8 rounded-[3rem] border-white/10 text-center">
+                            <h3 class="text-[10px] font-black text-slate-500 mb-6 uppercase tracking-widest italic">Ожидание</h3>
+                            <div class="flex flex-wrap gap-2 justify-center">${u.map(p => `<span class="px-4 py-2 bg-slate-800 rounded-full text-xs font-black shadow-lg border border-white/5">${p.name}</span>`).join('')}</div>
+                        </div>
+                        <button onclick="shuffleAction()" class="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2.5rem] font-black text-xl active:scale-95 transition-all uppercase tracking-widest shadow-2xl"><i data-lucide="shuffle" class="inline mr-2 w-6 h-6"></i> SHUFFLE</button>
+                        <button onclick="confirmTeamsAction()" class="w-full py-4 bg-white hover:bg-slate-200 text-black rounded-[2rem] font-black text-sm active:scale-95 transition-all uppercase tracking-widest shadow-xl">CONFIRM TEAMS</button>
                     </div>
-                    <div class="team-card p-6 rounded-[2rem] border-t-4 border-t-red-600">
-                        <h3 class="text-xl font-black text-red-600 mb-4 italic text-right">DIRE (${d.length})</h3>
-                        <div class="space-y-2">${d.map(p => `<div class="p-3 bg-white/5 rounded-xl font-bold flex items-center flex-row-reverse gap-3 text-right">${p.photo ? `<img src="${p.photo}" class="w-5 h-5 rounded">`:''}${p.name}</div>`).join('')}</div>
+                    <div class="team-card p-8 rounded-[3rem] border-t-8 border-t-red-600/80">
+                        <h3 class="text-2xl font-black text-red-600 mb-6 italic text-right uppercase tracking-tighter">DIRE (${d.length})</h3>
+                        <div class="space-y-3">${d.map(p => `<div class="p-3.5 bg-white/5 rounded-2xl font-bold flex items-center flex-row-reverse gap-3 text-right">${p.photo ? `<img src="${p.photo}" class="w-6 h-6 rounded-lg shadow">`:''}${p.name}</div>`).join('')}</div>
                     </div>
                 </div>`;
         };
 
         const renderInit = (c) => {
             c.innerHTML = `
-                <div class="flex items-center justify-center min-h-[40vh]">
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/10 text-center w-full max-w-md">
-                        <h2 class="text-xl font-black text-white mb-8 uppercase tracking-widest">ИГРОКИ: ${roomData.teamSizeRadiant} VS ${roomData.teamSizeDire}</h2>
-                        <button onclick="startDraftSetup()" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest">ПЕРЕЙТИ К ПУЛУ</button>
+                <div class="flex items-center justify-center min-h-[40vh] animate-in zoom-in duration-500">
+                    <div class="bg-[#15171e] p-12 rounded-[4rem] border border-white/10 text-center w-full max-w-md shadow-2xl">
+                        <div class="w-20 h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-blue-500/20">
+                            <i data-lucide="users" class="text-blue-500 w-10 h-10"></i>
+                        </div>
+                        <h2 class="text-2xl font-black text-white mb-10 uppercase tracking-widest">${roomData.teamSizeRadiant} VS ${roomData.teamSizeDire}</h2>
+                        <button onclick="startDraftSetup()" class="w-full py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest shadow-xl">ПЕРЕЙТИ К ПУЛУ</button>
                     </div>
                 </div>`;
         };
 
         const renderSetup = (c) => {
             c.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    <div class="bg-[#15171e] p-7 rounded-3xl border border-white/5 h-fit shadow-2xl">
-                        <h2 class="text-xs font-black mb-8 text-blue-400 uppercase tracking-widest italic">Настройка Пула</h2>
-                        <div class="space-y-4">${[1,2,3,4,5].map((p,i) => `<div class="flex items-center justify-between"><span class="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Позиция ${p}</span><input type="number" value="${roomData.nValues[i]}" onchange="let v=[...roomData.nValues];v[${i}]=parseInt(this.value);updateRoom({nValues:v})" class="w-16 bg-black/40 rounded-lg p-2 text-center text-white outline-none border border-white/10 font-mono text-xl"></div>`).join('')}</div>
-                        <button onclick="generatePoolAction()" class="w-full mt-10 py-5 bg-blue-600 text-white rounded-2xl font-black text-lg active:scale-95 transition-all uppercase tracking-widest shadow-xl">СГЕНЕРИРОВАТЬ</button>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in duration-700">
+                    <div class="bg-[#15171e] p-8 rounded-[3rem] border border-white/5 h-fit shadow-2xl">
+                        <h2 class="text-[11px] font-black mb-10 text-blue-400 uppercase tracking-[0.2em] italic">Настройка Пула</h2>
+                        <div class="space-y-6">
+                            ${[1,2,3,4,5].map((p,i) => `
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Позиция ${p}</span>
+                                    <input type="number" value="${roomData.nValues[i]}" onchange="let v=[...roomData.nValues];v[${i}]=parseInt(this.value);updateRoom({nValues:v})" class="w-18 bg-black/60 rounded-xl p-3 text-center text-white outline-none border border-white/10 font-mono text-2xl focus:border-blue-500 transition-all">
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button onclick="generatePoolAction()" class="w-full mt-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-black text-lg active:scale-95 transition-all uppercase tracking-widest shadow-2xl">СГЕНЕРИРОВАТЬ</button>
                     </div>
-                    <div class="lg:col-span-3 bg-[#15171e] p-8 rounded-3xl border border-white/5 shadow-2xl">
-                        <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-4 opacity-30 grayscale">
-                            ${HEROES.slice(0, 24).map(h => `<div class="hero-img-container rounded-xl border border-white/5">${getHeroImg(h)}</div>`).join('')}
+                    <div class="lg:col-span-3 bg-[#15171e] p-10 rounded-[3.5rem] border border-white/5 shadow-2xl">
+                        <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-5 opacity-20 grayscale">
+                            ${HEROES.slice(0, 24).map(h => `<div class="hero-img-container rounded-2xl border border-white/5 shadow-lg">${getHeroImg(h)}</div>`).join('')}
                         </div>
                     </div>
                 </div>`;
@@ -449,27 +479,27 @@
             const picker = isBanning ? (roomData.bans.length % 2 === 0 ? 'Radiant' : 'Dire') : (step ? step.team : null);
             
             c.innerHTML = `
-                <div class="space-y-8 animate-in slide-in-from-bottom duration-700">
+                <div class="space-y-10 animate-in slide-in-from-bottom duration-1000">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-                        <div class="team-card p-6 rounded-[2.5rem] border-4 transition-all duration-700 ${picker==='Radiant'?'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]':'border-transparent'}">
-                            <h3 class="text-3xl font-black text-green-500 mb-6 italic tracking-tighter uppercase">RADIANT</h3>
-                            <div class="grid grid-cols-5 gap-2">${[...Array(roomData.teamSizeRadiant)].map((_,i) => `<div class="hero-img-container rounded-xl bg-black/50 border-2 border-white/5">${getHeroImg(roomData.picksRadiant[i])}</div>`).join('')}</div>
+                        <div class="team-card p-8 rounded-[3.5rem] border-4 transition-all duration-700 ${picker==='Radiant'?'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.15)]':'border-transparent'}">
+                            <h3 class="text-3xl font-black text-green-500 mb-8 italic tracking-tighter uppercase">RADIANT</h3>
+                            <div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeRadiant)].map((_,i) => `<div class="hero-img-container rounded-2xl bg-black/50 border-2 border-white/5 shadow-inner">${getHeroImg(roomData.picksRadiant[i])}</div>`).join('')}</div>
                         </div>
-                        <div class="bg-[#1a1d26] p-8 rounded-[2.5rem] border-2 border-white/10 text-center shadow-2xl">
-                            ${roomData.stage==='result' ? `<div class="text-amber-500 font-black text-7xl italic animate-pulse">БИТВА!</div>` : `<div class="text-7xl font-black italic tracking-tighter ${isBanning?'text-shimmer-red':'text-white'}">${isBanning?'БАН':'ПИК'}</div><div class="text-2xl font-black mt-2 tracking-widest ${picker==='Radiant'?'text-green-500':'text-red-600'}">${picker?picker.toUpperCase():''}</div>`}
-                            <div class="flex justify-center gap-2 mt-8">${[0,1,2,3].map(i => `<div class="w-12 h-16 bg-black rounded-xl overflow-hidden grayscale opacity-50 border-2 border-red-900/20">${getHeroImg(roomData.bans[i])}</div>`).join('')}</div>
+                        <div class="bg-[#1a1d26] p-10 rounded-[3.5rem] border-2 border-white/10 text-center shadow-2xl flex flex-col justify-center min-h-[280px]">
+                            ${roomData.stage==='result' ? `<div class="text-amber-500 font-black text-8xl italic animate-pulse drop-shadow-[0_0_20px_rgba(245,158,11,0.5)] uppercase tracking-tighter">БИТВА!</div>` : `<div class="text-8xl font-black italic tracking-tighter ${isBanning?'text-shimmer-red':'text-white'}">${isBanning?'БАН':'ПИК'}</div><div class="text-3xl font-black mt-3 tracking-widest ${picker==='Radiant'?'text-green-500':'text-red-600'}">${picker?picker.toUpperCase():''}</div>`}
+                            <div class="flex justify-center gap-2 mt-10">${[0,1,2,3].map(i => `<div class="w-14 h-20 bg-black rounded-2xl overflow-hidden grayscale opacity-40 border-2 border-red-900/20 shadow-lg">${getHeroImg(roomData.bans[i])}</div>`).join('')}</div>
                         </div>
-                        <div class="team-card p-6 rounded-[2.5rem] border-4 transition-all duration-700 ${picker==='Dire'?'border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.1)]':'border-transparent'}">
-                            <h3 class="text-3xl font-black text-red-600 mb-6 italic tracking-tighter uppercase text-right">DIRE</h3>
-                            <div class="grid grid-cols-5 gap-2">${[...Array(roomData.teamSizeDire)].map((_,i) => `<div class="hero-img-container rounded-xl bg-black/50 border-2 border-white/5 flex-row-reverse">${getHeroImg(roomData.picksDire[i])}</div>`).join('')}</div>
+                        <div class="team-card p-8 rounded-[3.5rem] border-4 transition-all duration-700 ${picker==='Dire'?'border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.15)]':'border-transparent'}">
+                            <h3 class="text-3xl font-black text-red-600 mb-8 italic tracking-tighter uppercase text-right">DIRE</h3>
+                            <div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeDire)].map((_,i) => `<div class="hero-img-container rounded-2xl bg-black/50 border-2 border-white/5 shadow-inner flex-row-reverse">${getHeroImg(roomData.picksDire[i])}</div>`).join('')}</div>
                         </div>
                     </div>
-                    <div class="bg-[#15171e] p-10 rounded-[3rem] border border-white/5 shadow-2xl">
-                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-4">
+                    <div class="bg-[#15171e] p-12 rounded-[4rem] border border-white/5 shadow-2xl">
+                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-6">
                             ${roomData.pool.map(h => {
                                 const isB = roomData.bans.find(x=>x.id===h.id);
                                 const isP = [...roomData.picksRadiant, ...roomData.picksDire].find(x=>x.id===h.id);
-                                return `<div onclick="handleHeroClick(${h.id})" class="hero-img-container rounded-xl border-2 cursor-pointer transition-all duration-300 ${isB?'opacity-10 grayscale':isP?'opacity-5':'border-slate-800 hover:border-amber-500 hover:scale-105 shadow-xl'}">${getHeroImg(h)}</div>`;
+                                return `<div onclick="handleHeroClick(${h.id})" class="hero-img-container rounded-2xl border-2 cursor-pointer transition-all duration-500 ${isB?'opacity-10 grayscale scale-90':isP?'opacity-5 scale-90':'border-slate-800 hover:border-amber-500 hover:scale-110 hover:z-10 shadow-2xl'}">${getHeroImg(h)}</div>`;
                             }).join('')}
                         </div>
                     </div>
