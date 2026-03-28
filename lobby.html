@@ -16,10 +16,10 @@
         .text-shimmer { background: linear-gradient(90deg, #fff, #4ade80, #fff); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
         .text-shimmer-red { background: linear-gradient(90deg, #fff, #ef4444, #fff); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
         .team-card { background: rgba(21, 23, 30, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
-        .google-btn { transition: all 0.3s ease; background: white; color: #1f2937; }
+        .google-btn { transition: all 0.3s ease; background: white; color: #1f2937; border-radius: 1rem; }
         .google-btn:hover { background: #f3f4f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255,255,255,0.1); }
         .player-row { transition: all 0.2s ease; cursor: pointer; }
-        .player-row:hover { background: rgba(255,255,255,0.1); transform: translateX(4px); }
+        .player-row:hover { background: rgba(255,255,255,0.05); transform: translateX(4px); }
         .admin-badge { background: linear-gradient(to right, #f59e0b, #d97706); color: white; padding: 2px 6px; border-radius: 4px; font-size: 7px; font-weight: 900; }
     </style>
 </head>
@@ -43,7 +43,7 @@
             <main id="main-content">
                 <div id="loading-state" class="flex flex-col items-center justify-center min-h-[50vh] gap-4">
                     <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
-                    <p class="text-slate-500 animate-pulse uppercase text-xs font-black tracking-widest">Инициализация...</p>
+                    <p class="text-slate-500 animate-pulse uppercase text-xs font-black tracking-widest">Инициализация Dota Network...</p>
                 </div>
             </main>
         </div>
@@ -54,6 +54,7 @@
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+        // --- FIREBASE CONFIG ---
         const manualConfig = {
             apiKey: "AIzaSyBOv8Tf0Z-XnSp3DUHstPo7FZyb1SPuAgA",
             authDomain: "project-578-032.firebaseapp.com",
@@ -73,7 +74,7 @@
         const provider = new GoogleAuthProvider();
 
         let localUser = { name: '', uid: '', photo: '' };
-        let roomData = { id: '', stage: 'entry', players: [], nValues: [5,5,5,5,5] };
+        let roomData = { id: '', stage: 'entry', players: [], nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [] };
         let searchTerm = "";
 
         const HEROES = [
@@ -205,108 +206,44 @@
 
         const CDN_BASE = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/";
 
-        const showError = (msg) => {
-            const main = document.getElementById('main-content');
-            main.innerHTML = `<div class="p-8 text-center bg-red-500/10 border-2 border-red-500/20 rounded-3xl"><h2 class="text-xl font-black mb-2 uppercase text-red-500">Ошибка</h2><p class="text-slate-400 mb-6">${msg}</p><button onclick="window.location.reload()" class="px-6 py-2 bg-red-600 rounded-lg font-black uppercase text-xs">Обновить</button></div>`;
-            lucide.createIcons();
-        };
+        const isAdmin = () => roomData.players.length > 0 && roomData.players[0].uid === localUser.uid;
 
-        const init = () => {
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    localUser.uid = user.uid;
-                    localUser.name = user.displayName || "Gamer";
-                    localUser.photo = user.photoURL || "";
-                    render();
-                } else {
-                    renderEntry(document.getElementById('main-content'));
-                }
-            });
-        };
-
+        // --- GLOBAL BINDINGS ---
+        // Эти строки делают функции доступными для HTML-атрибутов (onclick)
         window.loginWithGoogle = async () => {
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (e) {
-                console.error(e);
-                showError("Ошибка входа через Google. Убедитесь, что Auth включен в Firebase.");
-            }
+            try { await signInWithPopup(auth, provider); } 
+            catch (e) { showError("Ошибка входа Google. Убедитесь, что Google метод включен в консоли Firebase."); }
         };
 
-        window.logoutAction = async () => {
-            await signOut(auth);
-            window.location.reload();
+        window.logoutAction = async () => { await signOut(auth); window.location.reload(); };
+
+        window.joinRoomAction = () => {
+            const input = document.getElementById('room-code-input');
+            const code = input ? input.value.trim().toUpperCase() : "";
+            if (code) joinRoom(code);
         };
-
-        const joinRoom = async (code) => {
-            if (!code) return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
-            try {
-                const snap = await getDoc(roomRef);
-                const playerData = { uid: localUser.uid, name: localUser.name, photo: localUser.photo, team: 'unassigned' };
-                
-                if (!snap.exists()) {
-                    await setDoc(roomRef, {
-                        id: code, stage: 'lobby', players: [playerData],
-                        teamSizeRadiant: 5, teamSizeDire: 5, nValues: [5, 5, 5, 5, 5],
-                        pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: []
-                    });
-                } else {
-                    let players = snap.data().players || [];
-                    if (!players.find(p => p.uid === localUser.uid)) {
-                        players.push(playerData);
-                        await updateDoc(roomRef, { players });
-                    }
-                }
-
-                onSnapshot(roomRef, (doc) => {
-                    if (doc.exists()) {
-                        roomData = doc.data();
-                        render();
-                    }
-                });
-            } catch (e) {
-                console.error(e);
-                showError("Ошибка доступа. Проверьте Security Rules.");
-            }
-        };
-
-        const updateRoom = async (updates) => {
-            if (!roomData.id) return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id);
-            await updateDoc(roomRef, updates);
-        };
-
-        // --- ЛОГИКА АДМИНА И БОТОВ ---
-        const isAdmin = () => roomData.players[0]?.uid === localUser.uid;
 
         window.addBotAction = () => {
             if (!isAdmin()) return;
             const botId = 'bot_' + Math.random().toString(36).substr(2, 9);
-            const botNames = ["Dendi Bot", "Puppey Bot", "Miracle Bot", "Topson Bot", "KuroKy Bot", "SumaiL Bot", "Arteezy Bot", "GH Bot"];
-            const bot = {
-                uid: botId,
-                name: botNames[Math.floor(Math.random() * botNames.length)] + " " + Math.floor(Math.random()*99),
-                photo: "https://www.gravatar.com/avatar/" + botId + "?d=identicon",
-                team: 'unassigned'
+            const botNames = ["Puppey Bot", "Dendi Bot", "KuroKy Bot", "Notail Bot", "Ceb Bot", "Solo Bot", "Arteezy Bot"];
+            const bot = { 
+                uid: botId, 
+                name: botNames[Math.floor(Math.random() * botNames.length)], 
+                photo: "https://www.gravatar.com/avatar/" + botId + "?d=identicon", 
+                team: 'unassigned' 
             };
-            if (roomData.players.length < 12) {
-                updateRoom({ players: [...roomData.players, bot] });
-            }
+            if (roomData.players.length < 12) updateRoom({ players: [...roomData.players, bot] });
         };
 
         window.togglePlayerTeam = (uid) => {
-            // Разрешаем игроку менять свою команду, либо админу менять любую
             if (uid !== localUser.uid && !isAdmin()) return;
-            
             const players = [...roomData.players];
-            const pIdx = players.findIndex(x => x.uid === uid);
-            if (pIdx === -1) return;
-
-            const stages = ['unassigned', 'Radiant', 'Dire'];
-            let currentIdx = stages.indexOf(players[pIdx].team);
-            players[pIdx].team = stages[(currentIdx + 1) % stages.length];
-            
+            const idx = players.findIndex(p => p.uid === uid);
+            if (idx === -1) return;
+            const teams = ['unassigned', 'Radiant', 'Dire'];
+            const curTeamIdx = teams.indexOf(players[idx].team);
+            players[idx].team = teams[(curTeamIdx + 1) % teams.length];
             updateRoom({ players });
         };
 
@@ -314,7 +251,7 @@
             if (!isAdmin()) return;
             let p = [...roomData.players];
             p.sort(() => Math.random() - 0.5);
-            p.forEach((player, i) => player.team = i < p.length/2 ? 'Radiant' : 'Dire');
+            p.forEach((player, i) => player.team = i < p.length / 2 ? 'Radiant' : 'Dire');
             updateRoom({ players: p });
         };
 
@@ -325,8 +262,8 @@
             updateRoom({ stage: 'init', teamSizeRadiant: r || 5, teamSizeDire: d || 5 });
         };
 
-        // --- ДРАФТ ЛОГИКА ---
         window.startDraftSetup = () => {
+            if (!isAdmin()) return;
             const seq = [];
             let ra=0, da=0, ct='Radiant', rc=roomData.teamSizeRadiant, dc=roomData.teamSizeDire;
             while(ra<rc || da<dc) {
@@ -337,23 +274,11 @@
             updateRoom({ draftSequence: seq, stage: 'setup' });
         };
 
-        window.toggleHeroTag = (id, pos) => {
-            // Локальная логика для изменения HEROES (обычно это в БД, но тут мы меняем roomData.pool если он есть)
-            // Но по ТЗ это этап настройки пула.
-            // В идеале мы должны менять глобальный конфиг, но для простоты просто перерисуем.
-            const hero = HEROES.find(h => h.id === id);
-            if (hero.positions.includes(pos)) {
-                hero.positions = hero.positions.filter(p => p !== pos);
-            } else {
-                hero.positions.push(pos);
-            }
-            render();
-        };
-
         window.generatePoolAction = () => {
+            if (!isAdmin()) return;
             let pool = []; let used = new Set();
             roomData.nValues.forEach((n, i) => {
-                const pos = i+1;
+                const pos = i + 1;
                 const eligible = HEROES.filter(h => h.positions.includes(pos) && !used.has(h.id))
                     .sort(() => 0.5 - Math.random()).slice(0, n);
                 eligible.forEach(h => { used.add(h.id); pool.push(h); });
@@ -361,211 +286,122 @@
             updateRoom({ pool, stage: 'banning' });
         };
 
+        window.toggleHeroTag = (heroId, pos) => {
+            if (!isAdmin()) return;
+            const h = HEROES.find(x => x.id === heroId);
+            if (!h) return;
+            if (h.positions.includes(pos)) h.positions = h.positions.filter(p => p !== pos);
+            else h.positions.push(pos);
+            render(); // Локальный рендер списка героев
+        };
+
         window.handleHeroClick = (id) => {
             const h = roomData.pool.find(x => x.id === id);
             if (!h) return;
             if (roomData.stage === 'banning' && roomData.bans.length < 4 && !roomData.bans.find(x => x.id === id)) {
-                const b = [...roomData.bans, h];
-                updateRoom({ bans: b, stage: b.length === 4 ? 'picking' : 'banning' });
+                updateRoom({ bans: [...roomData.bans, h], stage: (roomData.bans.length + 1 === 4) ? 'picking' : 'banning' });
             } else if (roomData.stage === 'picking') {
                 const used = [...roomData.bans, ...roomData.picksRadiant, ...roomData.picksDire].find(x => x.id === id);
                 if (!used) {
-                    const total = roomData.picksRadiant.length + roomData.picksDire.length;
-                    let acc=0, stepIdx=-1;
-                    for(let i=0; i<roomData.draftSequence.length; i++) {
+                    const totalPicked = roomData.picksRadiant.length + roomData.picksDire.length;
+                    let acc = 0, stepIdx = -1;
+                    for (let i = 0; i < roomData.draftSequence.length; i++) {
                         acc += roomData.draftSequence[i].count;
-                        if(total < acc) { stepIdx = i; break; }
+                        if (totalPicked < acc) { stepIdx = i; break; }
                     }
                     const step = roomData.draftSequence[stepIdx];
                     if (!step) return;
                     if (step.team === 'Radiant') {
-                        const p = [...roomData.picksRadiant, h];
-                        updateRoom({ picksRadiant: p, stage: (p.length === roomData.teamSizeRadiant && roomData.picksDire.length === roomData.teamSizeDire) ? 'result' : 'picking' });
+                        const newPicks = [...roomData.picksRadiant, h];
+                        updateRoom({ picksRadiant: newPicks, stage: (newPicks.length === roomData.teamSizeRadiant && roomData.picksDire.length === roomData.teamSizeDire) ? 'result' : 'picking' });
                     } else {
-                        const p = [...roomData.picksDire, h];
-                        updateRoom({ picksDire: p, stage: (p.length === roomData.teamSizeDire && roomData.picksRadiant.length === roomData.teamSizeRadiant) ? 'result' : 'picking' });
+                        const newPicks = [...roomData.picksDire, h];
+                        updateRoom({ picksDire: newPicks, stage: (newPicks.length === roomData.teamSizeDire && roomData.picksRadiant.length === roomData.teamSizeRadiant) ? 'result' : 'picking' });
                     }
                 }
             }
         };
 
-        const render = () => {
-            const main = document.getElementById('main-content');
-            const roomDisplay = document.getElementById('room-display');
-            const headerControls = document.getElementById('header-controls');
-            
-            if (roomData.id) roomDisplay.innerHTML = `ROOM: <span class="text-amber-500 font-black">${roomData.id}</span>`;
-
-            headerControls.innerHTML = `
-                <div class="flex items-center gap-3 bg-white/5 p-1.5 rounded-xl border border-white/5">
-                    ${localUser.photo ? `<img src="${localUser.photo}" class="w-8 h-8 rounded-lg">` : ''}
-                    <div class="flex flex-col">
-                        <span class="text-[9px] font-black uppercase text-slate-300 leading-none">${localUser.name}</span>
-                        ${isAdmin() ? '<span class="admin-badge mt-1 uppercase text-center">Admin</span>' : '<span class="text-[7px] font-bold uppercase text-slate-600 leading-none mt-1">Player</span>'}
-                    </div>
-                    <button onclick="logoutAction()" class="p-2 text-slate-500 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-3.5 h-3.5"></i></button>
-                </div>
-            `;
-
-            if (roomData.id === '') renderRoomJoin(main);
-            else if (roomData.stage === 'lobby') renderLobby(main);
-            else if (roomData.stage === 'init') renderInit(main);
-            else if (roomData.stage === 'setup') renderSetup(main);
-            else renderDraft(main);
+        // --- CORE LOGIC ---
+        const showError = (msg) => {
+            document.getElementById('main-content').innerHTML = `<div class="p-8 text-center bg-red-500/10 border border-red-500/20 rounded-3xl"><h2 class="text-xl font-black mb-2 uppercase text-red-500">Ошибка</h2><p class="text-slate-400 mb-6">${msg}</p><button onclick="window.location.reload()" class="px-6 py-2 bg-red-600 rounded-lg font-black uppercase text-xs">Обновить</button></div>`;
             lucide.createIcons();
         };
 
+        const init = () => {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    localUser = { uid: user.uid, name: user.displayName || "Gamer", photo: user.photoURL || "https://www.gravatar.com/avatar/0?d=mp" };
+                    render();
+                } else {
+                    renderEntry(document.getElementById('main-content'));
+                }
+            });
+        };
+
+        const joinRoom = async (code) => {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+            try {
+                const snap = await getDoc(roomRef);
+                const p = { uid: localUser.uid, name: localUser.name, photo: localUser.photo, team: 'unassigned' };
+                if (!snap.exists()) {
+                    await setDoc(roomRef, { id: code, stage: 'lobby', players: [p], nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [], teamSizeRadiant: 5, teamSizeDire: 5 });
+                } else {
+                    let players = snap.data().players || [];
+                    if (!players.find(x => x.uid === localUser.uid)) {
+                        players.push(p);
+                        await updateDoc(roomRef, { players });
+                    }
+                }
+                onSnapshot(roomRef, (d) => { if (d.exists()) { roomData = d.data(); render(); } }, (e) => showError("Firestore Rules Error. Проверьте консоль Firebase."));
+            } catch (e) { showError("Ошибка подключения. Проверьте права доступа БД."); }
+        };
+
+        const updateRoom = async (updates) => { if (roomData.id) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), updates); };
+
         const getHeroImg = (h) => h ? `<img src="${CDN_BASE}${h.imgName}.png" class="hero-img" alt="${h.name}">` : '';
 
+        // --- RENDERS ---
         const renderEntry = (c) => {
-            c.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in duration-500">
-                    <div class="bg-[#15171e] p-12 rounded-[3.5rem] border border-white/10 shadow-2xl w-full max-w-md space-y-10 text-center">
-                        <div class="space-y-3">
-                            <h2 class="text-4xl font-black text-white uppercase italic tracking-tighter">Вход</h2>
-                            <p class="text-slate-500 text-xs font-bold uppercase tracking-[0.2em]">Авторизуйтесь через Google</p>
-                        </div>
-                        <button onclick="loginWithGoogle()" class="google-btn w-full py-5 flex items-center justify-center gap-4 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg">
-                            <i data-lucide="log-in"></i> ВХОД ЧЕРЕЗ GOOGLE
-                        </button>
-                    </div>
-                </div>`;
+            c.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[50vh] animate-in zoom-in"><div class="bg-[#15171e] p-12 rounded-[3.5rem] border border-white/10 shadow-2xl text-center space-y-10"><div><h2 class="text-4xl font-black text-white italic tracking-tighter mb-2">ВХОД</h2><p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Авторизация через Google</p></div><button onclick="loginWithGoogle()" class="google-btn w-full py-5 flex items-center justify-center gap-4 font-black text-lg uppercase tracking-widest"><i data-lucide="log-in"></i> Вход по Google</button></div></div>`;
+            lucide.createIcons();
         };
 
         const renderRoomJoin = (c) => {
-            c.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-[40vh] animate-in slide-in-from-top duration-500">
-                    <div class="bg-[#15171e] p-12 rounded-[3.5rem] border border-white/10 shadow-2xl w-full max-w-md space-y-8">
-                        <div class="text-center">
-                            <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2 italic">Привет, ${localUser.name}</p>
-                            <h2 class="text-3xl font-black text-white uppercase tracking-tighter italic">Войти в комнату</h2>
-                        </div>
-                        <input id="room-code-input" placeholder="КОД КОМНАТЫ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-2xl font-black text-center text-white outline-none focus:border-amber-500 transition-all uppercase tracking-[0.3em]">
-                        <button onclick="joinRoomAction()" class="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-2xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest shadow-xl">ПОДКЛЮЧИТЬСЯ</button>
-                    </div>
-                </div>`;
+            c.innerHTML = `<div class="flex items-center justify-center min-h-[40vh] animate-in slide-in-from-top"><div class="bg-[#15171e] p-12 rounded-[3.5rem] border border-white/10 shadow-2xl w-full max-w-md text-center space-y-8"><div><p class="text-slate-500 text-[10px] font-black mb-2 uppercase italic">Привет, ${localUser.name}</p><h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Войти в комнату</h2></div><input id="room-code-input" placeholder="КОД КОМНАТЫ" class="w-full bg-black/40 border-2 border-white/5 rounded-2xl p-5 text-2xl font-black text-center text-white outline-none focus:border-amber-500 transition-all uppercase tracking-widest"><button onclick="joinRoomAction()" class="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-2xl font-black text-xl uppercase tracking-widest shadow-xl active:scale-95 transition-all">ПОДКЛЮЧИТЬСЯ</button></div></div>`;
         };
 
         const renderLobby = (c) => {
             const r = roomData.players.filter(p => p.team === 'Radiant');
             const d = roomData.players.filter(p => p.team === 'Dire');
             const u = roomData.players.filter(p => p.team === 'unassigned');
+            const pCard = (p) => `<div onclick="togglePlayerTeam('${p.uid}')" class="player-row p-3.5 bg-white/5 rounded-2xl font-bold flex items-center gap-3 ${p.uid === localUser.uid ? 'ring-1 ring-amber-500/30' : ''}"><img src="${p.photo}" class="w-7 h-7 rounded-lg shadow-lg"><div><span class="text-sm block leading-tight">${p.name}</span>${p.uid === roomData.players[0].uid ? '<span class="admin-badge mt-0.5 inline-block">HOST</span>':''}</div>${p.uid === localUser.uid || isAdmin() ? '<i data-lucide="refresh-cw" class="w-3 h-3 ml-auto text-slate-700"></i>' : ''}</div>`;
             
-            const playerCard = (p) => `
-                <div onclick="togglePlayerTeam('${p.uid}')" class="player-row p-3.5 bg-white/5 rounded-2xl font-bold flex items-center gap-3 ${p.uid === localUser.uid ? 'ring-2 ring-amber-500/50' : ''}">
-                    <img src="${p.photo}" class="w-7 h-7 rounded-lg shadow-lg">
-                    <div class="flex flex-col">
-                        <span class="text-sm leading-tight">${p.name}</span>
-                        ${p.uid === roomData.players[0].uid ? '<span class="text-[7px] text-amber-500 uppercase font-black">Host</span>' : ''}
-                    </div>
-                    ${p.uid === localUser.uid ? '<i data-lucide="refresh-cw" class="w-3 h-3 ml-auto text-slate-600"></i>' : ''}
-                </div>
-            `;
-
-            c.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-700">
-                    <!-- RADIANT -->
-                    <div class="team-card p-8 rounded-[3rem] border-t-8 border-t-green-500/80">
-                        <h3 class="text-2xl font-black text-green-500 mb-6 italic uppercase tracking-tighter">RADIANT (${r.length})</h3>
-                        <div class="space-y-3">${r.map(playerCard).join('')}</div>
-                    </div>
-
-                    <!-- CONTROLS -->
-                    <div class="flex flex-col gap-6">
-                        <div class="team-card p-8 rounded-[3rem] border-white/10 text-center">
-                            <h3 class="text-[10px] font-black text-slate-500 mb-6 uppercase tracking-widest italic">Список ожидания</h3>
-                            <div class="space-y-2">${u.map(playerCard).join('')}</div>
-                            ${u.length === 0 ? '<p class="text-[10px] text-slate-700 uppercase font-black">Все распределены</p>' : ''}
-                        </div>
-                        
-                        ${isAdmin() ? `
-                            <div class="grid grid-cols-1 gap-4">
-                                <button onclick="addBotAction()" class="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest active:scale-95 transition-all border border-white/5 shadow-xl flex items-center justify-center gap-2">
-                                    <i data-lucide="user-plus" class="w-4 h-4"></i> ДОБАВИТЬ БОТА
-                                </button>
-                                <button onclick="shuffleAction()" class="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2.5rem] font-black text-xl active:scale-95 transition-all uppercase tracking-widest shadow-2xl">
-                                    <i data-lucide="shuffle" class="inline mr-2 w-6 h-6"></i> SHUFFLE
-                                </button>
-                                <button onclick="confirmTeamsAction()" class="w-full py-4 bg-white hover:bg-slate-200 text-black rounded-[2rem] font-black text-sm active:scale-95 transition-all uppercase tracking-widest shadow-xl">
-                                    ПОДТВЕРДИТЬ СОСТАВ
-                                </button>
-                            </div>
-                        ` : `
-                            <div class="p-6 text-center bg-white/5 rounded-3xl border border-white/5">
-                                <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Ожидание действий админа...</p>
-                                <p class="text-[8px] text-slate-700 mt-2">Вы можете кликнуть на свое имя, чтобы сменить команду вручную</p>
-                            </div>
-                        `}
-                    </div>
-
-                    <!-- DIRE -->
-                    <div class="team-card p-8 rounded-[3rem] border-t-8 border-t-red-600/80">
-                        <h3 class="text-2xl font-black text-red-600 mb-6 italic text-right uppercase tracking-tighter">DIRE (${d.length})</h3>
-                        <div class="space-y-3">${d.map(playerCard).join('')}</div>
-                    </div>
-                </div>`;
-        };
-
-        const renderInit = (c) => {
-            c.innerHTML = `
-                <div class="flex items-center justify-center min-h-[40vh] animate-in zoom-in duration-500">
-                    <div class="bg-[#15171e] p-12 rounded-[4rem] border border-white/10 text-center w-full max-w-md shadow-2xl">
-                        <div class="w-20 h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-blue-500/20">
-                            <i data-lucide="users" class="text-blue-500 w-10 h-10"></i>
-                        </div>
-                        <h2 class="text-2xl font-black text-white mb-10 uppercase tracking-widest">${roomData.teamSizeRadiant} VS ${roomData.teamSizeDire}</h2>
-                        ${isAdmin() ? `
-                            <button onclick="startDraftSetup()" class="w-full py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-black text-xl active:scale-95 transition-all uppercase tracking-widest shadow-xl">ПЕРЕЙТИ К ПУЛУ</button>
-                        ` : `<p class="text-xs text-slate-500 uppercase font-black tracking-widest">Админ настраивает драфт...</p>`}
-                    </div>
-                </div>`;
+            c.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in"><div class="team-card p-8 rounded-[3rem] border-t-8 border-t-green-500/80"><h3 class="text-2xl font-black text-green-500 mb-6 italic uppercase">RADIANT (${r.length})</h3><div class="space-y-3">${r.map(pCard).join('')}</div></div><div class="flex flex-col gap-6"><div class="team-card p-8 rounded-[3rem] border-white/10 text-center"><h3 class="text-[10px] font-black text-slate-500 mb-6 uppercase tracking-widest italic">В лобби</h3><div class="space-y-2">${u.map(pCard).join('')}</div></div>${isAdmin() ? '<div class="space-y-4"><button onclick="addBotAction()" class="w-full py-4 bg-slate-800 text-white rounded-[2rem] font-black text-xs uppercase border border-white/5 shadow-xl flex items-center justify-center gap-2"><i data-lucide="user-plus" class="w-4 h-4"></i> +BOT TEST</button><button onclick="shuffleAction()" class="w-full py-6 bg-indigo-600 text-white rounded-[2.5rem] font-black text-xl uppercase shadow-2xl active:scale-95 transition-all"><i data-lucide="shuffle" class="inline mr-2 w-6 h-6"></i> SHUFFLE</button><button onclick="confirmTeamsAction()" class="w-full py-4 bg-white text-black rounded-[2rem] font-black text-sm uppercase shadow-xl active:scale-95 transition-all">CONFIRM TEAMS</button></div>' : '<div class="p-6 text-center bg-white/5 rounded-3xl border border-white/5"><p class="text-[10px] text-slate-500 uppercase font-black">Ожидание Админа...</p><p class="text-[8px] text-slate-700 mt-2 italic">Нажмите на себя, чтобы сменить сторону</p></div>'}</div><div class="team-card p-8 rounded-[3rem] border-t-8 border-t-red-600/80"><h3 class="text-2xl font-black text-red-600 mb-6 italic text-right uppercase">DIRE (${d.length})</h3><div class="space-y-3">${d.map(pCard).join('')}</div></div></div>`;
         };
 
         const renderSetup = (c) => {
             const filtered = HEROES.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()));
             c.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in duration-700">
-                    <div class="lg:col-span-1 space-y-6">
-                        <div class="bg-[#15171e] p-8 rounded-[3rem] border border-white/5 h-fit shadow-2xl">
-                            <h2 class="text-[11px] font-black mb-10 text-blue-400 uppercase tracking-[0.2em] italic">Настройка Пула</h2>
-                            <div class="space-y-6">
-                                ${[1,2,3,4,5].map((p,i) => `
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Позиция ${p}</span>
-                                        <input type="number" value="${roomData.nValues[i]}" onchange="let v=[...roomData.nValues];v[${i}]=parseInt(this.value);updateRoom({nValues:v})" class="w-18 bg-black/60 rounded-xl p-3 text-center text-white outline-none border border-white/10 font-mono text-2xl focus:border-blue-500 transition-all" ${!isAdmin()?'disabled':''}>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            ${isAdmin() ? `
-                                <button onclick="generatePoolAction()" class="w-full mt-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-3xl font-black text-lg active:scale-95 transition-all uppercase tracking-widest shadow-2xl">СГЕНЕРИРОВАТЬ ПУЛ</button>
-                            ` : `<p class="mt-8 text-center text-[10px] text-slate-600 uppercase font-black">Админ выбирает кол-во героев</p>`}
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in">
+                    <div class="lg:col-span-1 space-y-6 h-fit sticky top-8">
+                        <div class="bg-[#15171e] p-8 rounded-[3rem] border border-white/5 shadow-2xl">
+                            <h2 class="text-[11px] font-black mb-10 text-blue-400 uppercase tracking-widest italic">Настройка Пула</h2>
+                            <div class="space-y-6">${[1,2,3,4,5].map((p,i) => `<div class="flex items-center justify-between"><span class="text-[10px] font-black text-slate-500 uppercase italic">Позиция ${p}</span><input type="number" value="${roomData.nValues[i]}" onchange="let v=[...roomData.nValues];v[${i}]=parseInt(this.value);updateRoom({nValues:v})" class="w-16 bg-black/60 rounded-xl p-3 text-center text-white outline-none border border-white/10 font-mono text-xl" ${!isAdmin()?'disabled':''}></div>`).join('')}</div>
+                            ${isAdmin() ? `<button onclick="generatePoolAction()" class="w-full mt-10 py-6 bg-blue-600 text-white rounded-3xl font-black text-lg uppercase tracking-widest shadow-xl active:scale-95">СГЕНЕРИРОВАТЬ ПУЛ</button>` : `<p class="mt-8 text-center text-[10px] text-slate-600 uppercase font-black italic">Админ выбирает кол-во героев...</p>`}
                         </div>
-                        
-                        <div class="bg-[#15171e] p-6 rounded-3xl border border-white/5 shadow-xl">
-                            <div class="relative">
-                                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600"></i>
-                                <input placeholder="Поиск героев..." oninput="searchTerm=this.value;render()" class="w-full bg-black/40 rounded-xl py-4 pl-12 pr-4 text-sm outline-none border border-white/5 focus:border-blue-500 transition-all">
-                            </div>
-                        </div>
+                        <div class="bg-[#15171e] p-6 rounded-3xl border border-white/5"><div class="relative"><i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600"></i><input placeholder="Найти героя..." oninput="searchTerm=this.value;render()" class="w-full bg-black/40 rounded-xl py-4 pl-12 pr-4 text-sm text-white border border-white/5 focus:border-blue-500 outline-none transition-all"></div></div>
                     </div>
-
                     <div class="lg:col-span-3 bg-[#15171e] p-8 rounded-[3.5rem] border border-white/5 shadow-2xl">
-                        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-7 gap-5">
+                        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-7 gap-5">
                             ${filtered.map(h => `
                                 <div class="group relative">
-                                    <div class="hero-img-container rounded-2xl border-2 border-white/5 shadow-lg group-hover:border-blue-500/50 transition-all overflow-hidden">
-                                        ${getHeroImg(h)}
+                                    <div class="hero-img-container rounded-2xl border-2 border-white/5 shadow-lg group-hover:border-blue-500/40 transition-all overflow-hidden">${getHeroImg(h)}</div>
+                                    <div class="mt-2 flex gap-0.5">
+                                        ${[1,2,3,4,5].map(pos => `<button onclick="toggleHeroTag(${h.id}, ${pos})" class="flex-1 text-[8px] font-black py-1 rounded transition-all ${h.positions.includes(pos) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-600 hover:bg-slate-700'}" ${!isAdmin()?'disabled':''}>${pos}</button>`).join('')}
                                     </div>
-                                    <div class="mt-2 flex gap-1">
-                                        ${[1,2,3,4,5].map(pos => `
-                                            <button onclick="toggleHeroTag(${h.id}, ${pos})" class="flex-1 text-[8px] font-black py-1.5 rounded-lg transition-all ${h.positions.includes(pos) ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-600 hover:bg-slate-700'}">
-                                                ${pos}
-                                            </button>
-                                        `).join('')}
-                                    </div>
-                                    <div class="mt-2 text-[10px] text-center font-black uppercase text-slate-400 group-hover:text-white truncate">${h.name}</div>
-                                </div>
-                            `).join('')}
+                                    <div class="mt-1.5 text-[9px] text-center font-black uppercase text-slate-500 truncate group-hover:text-white">${h.name}</div>
+                                </div>`).join('')}
                         </div>
                     </div>
                 </div>`;
@@ -573,41 +409,34 @@
 
         const renderDraft = (c) => {
             const total = roomData.picksRadiant.length + roomData.picksDire.length;
-            let acc=0, stepIdx=-1;
-            for(let i=0; i<roomData.draftSequence.length; i++) {
-                acc += roomData.draftSequence[i].count;
-                if(total < acc) { stepIdx = i; break; }
-            }
-            const step = roomData.draftSequence[stepIdx];
-            const isBanning = roomData.stage === 'banning';
-            const picker = isBanning ? (roomData.bans.length % 2 === 0 ? 'Radiant' : 'Dire') : (step ? step.team : null);
+            let acc=0, sIdx=-1; for(let i=0; i<roomData.draftSequence.length; i++) { acc+=roomData.draftSequence[i].count; if(total<acc){ sIdx=i; break; } }
+            const step = roomData.draftSequence[sIdx]; const isB = roomData.stage==='banning';
+            const picker = isB ? (roomData.bans.length % 2 === 0 ? 'Radiant' : 'Dire') : (step ? step.team : null);
             
-            c.innerHTML = `
-                <div class="space-y-10 animate-in slide-in-from-bottom duration-1000">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-                        <div class="team-card p-8 rounded-[3.5rem] border-4 transition-all duration-700 ${picker==='Radiant'?'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.15)]':'border-transparent'}">
-                            <h3 class="text-3xl font-black text-green-500 mb-8 italic tracking-tighter uppercase">RADIANT</h3>
-                            <div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeRadiant)].map((_,i) => `<div class="hero-img-container rounded-2xl bg-black/50 border-2 border-white/5 shadow-inner">${getHeroImg(roomData.picksRadiant[i])}</div>`).join('')}</div>
-                        </div>
-                        <div class="bg-[#1a1d26] p-10 rounded-[3.5rem] border-2 border-white/10 text-center shadow-2xl flex flex-col justify-center min-h-[280px]">
-                            ${roomData.stage==='result' ? `<div class="text-amber-500 font-black text-8xl italic animate-pulse drop-shadow-[0_0_20px_rgba(245,158,11,0.5)] uppercase tracking-tighter">БИТВА!</div>` : `<div class="text-8xl font-black italic tracking-tighter ${isBanning?'text-shimmer-red':'text-white'}">${isBanning?'БАН':'ПИК'}</div><div class="text-3xl font-black mt-3 tracking-widest ${picker==='Radiant'?'text-green-500':'text-red-600'}">${picker?picker.toUpperCase():''}</div>`}
-                            <div class="flex justify-center gap-2 mt-10">${[0,1,2,3].map(i => `<div class="w-14 h-20 bg-black rounded-2xl overflow-hidden grayscale opacity-40 border-2 border-red-900/20 shadow-lg">${getHeroImg(roomData.bans[i])}</div>`).join('')}</div>
-                        </div>
-                        <div class="team-card p-8 rounded-[3.5rem] border-4 transition-all duration-700 ${picker==='Dire'?'border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.15)]':'border-transparent'}">
-                            <h3 class="text-3xl font-black text-red-600 mb-8 italic tracking-tighter uppercase text-right">DIRE</h3>
-                            <div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeDire)].map((_,i) => `<div class="hero-img-container rounded-2xl bg-black/50 border-2 border-white/5 shadow-inner flex-row-reverse">${getHeroImg(roomData.picksDire[i])}</div>`).join('')}</div>
-                        </div>
-                    </div>
-                    <div class="bg-[#15171e] p-12 rounded-[4rem] border border-white/5 shadow-2xl">
-                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-6">
-                            ${roomData.pool.map(h => {
-                                const isB = roomData.bans.find(x=>x.id===h.id);
-                                const isP = [...roomData.picksRadiant, ...roomData.picksDire].find(x=>x.id===h.id);
-                                return `<div onclick="handleHeroClick(${h.id})" class="hero-img-container rounded-2xl border-2 cursor-pointer transition-all duration-500 ${isB?'opacity-10 grayscale scale-90':isP?'opacity-5 scale-90':'border-slate-800 hover:border-amber-500 hover:scale-110 hover:z-10 shadow-2xl'}">${getHeroImg(h)}</div>`;
-                            }).join('')}
-                        </div>
-                    </div>
-                </div>`;
+            c.innerHTML = `<div class="space-y-10 animate-in slide-in-from-bottom duration-1000"><div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start"><div class="team-card p-8 rounded-[3.5rem] border-4 transition-all duration-700 ${picker==='Radiant'?'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.1)]':'border-transparent'}"><h3 class="text-3xl font-black text-green-500 mb-8 italic uppercase tracking-tighter">RADIANT</h3><div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeRadiant)].map((_,i) => `<div class="hero-img-container rounded-2xl bg-black/50 border-2 border-white/5">${getHeroImg(roomData.picksRadiant[i])}</div>`).join('')}</div></div><div class="bg-[#1a1d26] p-10 rounded-[3.5rem] border-2 border-white/10 text-center shadow-2xl flex flex-col justify-center min-h-[280px]">${roomData.stage==='result' ? `<div class="text-amber-500 font-black text-8xl italic animate-pulse uppercase tracking-tighter">БИТВА!</div>` : `<div class="text-8xl font-black italic tracking-tighter ${isB?'text-shimmer-red':'text-white'}">${isB?'БАН':'ПИК'}</div><div class="text-3xl font-black mt-3 tracking-widest ${picker==='Radiant'?'text-green-500':'text-red-600'}">${picker?picker.toUpperCase():''}</div>`}<div class="flex justify-center gap-2 mt-10">${[0,1,2,3].map(i => `<div class="w-14 h-20 bg-black rounded-2xl overflow-hidden grayscale opacity-40 border-2 border-red-900/10">${getHeroImg(roomData.bans[i])}</div>`).join('')}</div></div><div class="team-card p-8 rounded-[3.5rem] border-4 transition-all duration-700 ${picker==='Dire'?'border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.1)]':'border-transparent'}"><h3 class="text-3xl font-black text-red-600 mb-8 italic text-right uppercase tracking-tighter">DIRE</h3><div class="grid grid-cols-5 gap-3">${[...Array(roomData.teamSizeDire)].map((_,i) => `<div class="hero-img-container rounded-2xl bg-black/50 border-2 border-white/5 flex-row-reverse">${getHeroImg(roomData.picksDire[i])}</div>`).join('')}</div></div></div><div class="bg-[#15171e] p-12 rounded-[4rem] border border-white/5 shadow-2xl"><div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-6">${roomData.pool.map(h => {
+                const isBanned = roomData.bans.find(x=>x.id===h.id); const isPicked = [...roomData.picksRadiant, ...roomData.picksDire].find(x=>x.id===h.id);
+                return `<div onclick="handleHeroClick(${h.id})" class="hero-img-container rounded-2xl border-2 cursor-pointer transition-all duration-500 ${isBanned?'opacity-10 grayscale scale-90':isPicked?'opacity-5 scale-90':'border-slate-800 hover:border-amber-500 hover:scale-110 shadow-2xl'}">${getHeroImg(h)}</div>`;
+            }).join('')}</div></div></div>`;
+        };
+
+        const renderInit = (c) => {
+            c.innerHTML = `<div class="flex items-center justify-center min-h-[40vh] animate-in zoom-in"><div class="bg-[#15171e] p-12 rounded-[4rem] border border-white/10 text-center w-full max-w-md shadow-2xl"><div class="w-20 h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-blue-500/20"><i data-lucide="users" class="text-blue-500 w-10 h-10"></i></div><h2 class="text-2xl font-black text-white mb-10 uppercase tracking-widest">${roomData.teamSizeRadiant} VS ${roomData.teamSizeDire}</h2>${isAdmin() ? `<button onclick="startDraftSetup()" class="w-full py-6 bg-blue-600 text-white rounded-3xl font-black text-xl uppercase shadow-xl">ПЕРЕЙТИ К ПУЛУ</button>` : `<p class="text-xs text-slate-500 uppercase font-black italic tracking-widest animate-pulse">Админ настраивает драфт...</p>`}</div></div>`;
+        };
+
+        const render = () => {
+            const main = document.getElementById('main-content');
+            const roomDisplay = document.getElementById('room-display');
+            const hControls = document.getElementById('header-controls');
+            if (roomData.id) roomDisplay.innerHTML = `ROOM: <span class="text-amber-500 font-black tracking-widest">${roomData.id}</span>`;
+            
+            hControls.innerHTML = `<div class="flex items-center gap-3 bg-white/5 p-1.5 rounded-xl border border-white/5"><img src="${localUser.photo}" class="w-8 h-8 rounded-lg shadow-lg border border-white/5"><div class="flex flex-col"><span class="text-[9px] font-black uppercase text-slate-300 leading-none">${localUser.name}</span><span class="${isAdmin()?'text-amber-500':'text-slate-600'} text-[7px] font-bold uppercase leading-none mt-1">${isAdmin()?'Host':'Player'}</span></div><button onclick="logoutAction()" class="p-2 text-slate-500 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-3.5 h-3.5"></i></button></div>`;
+
+            if (roomData.id === '') renderRoomJoin(main);
+            else if (roomData.stage === 'lobby') renderLobby(main);
+            else if (roomData.stage === 'init') renderInit(main);
+            else if (roomData.stage === 'setup') renderSetup(main);
+            else renderDraft(main);
+            lucide.createIcons();
         };
 
         init();
