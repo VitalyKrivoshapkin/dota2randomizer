@@ -17,7 +17,7 @@
         .text-shimmer { background: linear-gradient(90deg, #fff, #4ade80, #fff); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
         
         .team-card { background: rgba(21, 23, 30, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
-        .slot-box { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px dashed rgba(255,255,255,0.1); height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 1rem; position: relative; overflow: hidden; }
+        .slot-box { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px dashed rgba(255,255,255,0.1); height: 110px; display: flex; align-items: center; justify-content: center; border-radius: 1rem; position: relative; overflow: hidden; }
         
         .strategy-option { cursor: pointer; transition: all 0.3s; border: 1px solid transparent; width: 100%; }
         .strategy-option.active { border-color: rgba(255,255,255,0.2) !important; background: rgba(255, 255, 255, 0.05); }
@@ -311,9 +311,9 @@
                 await updateRoom({ votes: { ...roomData.votes, [localUser.uid]: heroId } }); // debounced
             } else if (roomData.stage === 'picking') {
                 const turnP = getCurrentPickPlayer();
-                // Slim: check bans by .i and picks as ID arrays
-                if (turnP?.uid === localUser.uid && !roomData.bans.find(b => b.i === heroId) && !roomData.picksRadiant?.includes(heroId) && !roomData.picksDire?.includes(heroId))
-                    await updateRoom({ pendingHeroId: heroId }); // debounced
+                if (turnP?.uid === localUser.uid && !roomData.bans.find(b => b.i === heroId) && !roomData.picksRadiant?.includes(heroId) && !roomData.picksDire?.includes(heroId)) {
+                    roomData.pendingHeroId = heroId; render();
+                }
             }
         };
 
@@ -479,14 +479,16 @@
                     const h = getHeroById(pickIds?.[i]), p = tP[i];
                     const activePlayerSlot = (roomData.stage === 'picking' && turnP && p && p.uid === turnP.uid);
                     const actSlotIdx = roomData.stage === 'picking' && roomData.currentTurnTeam === tN && (pickIds?.length || 0) === i;
+                    const isRandom = h && roomData.randomPickIds?.includes(h.id);
                     return `<div class="flex flex-col items-center gap-2">
-                        <div class="slot-box w-full bg-black/50 overflow-hidden ${activePlayerSlot ? 'active-picker-slot' : (actSlotIdx ? 'border-amber-500/20' : 'border-white/5')}">
+                        <div class="slot-box w-full bg-black/50 overflow-hidden ${activePlayerSlot ? 'active-picker-slot scale-100' : (actSlotIdx ? 'border-amber-500/20' : 'border-white/10')} relative">
                             ${getHeroImg(h)}
-                            ${p ? `<img src="${p.photo}" class="absolute top-1.5 left-1.5 ${activePlayerSlot?'w-12 h-12':'w-6 h-6'} rounded border border-white/30 shadow-xl z-20 transition-all">` : ''}
+                            ${p ? `<img src="${p.photo}" class="absolute top-2 left-2 ${activePlayerSlot?'w-14 h-14':'w-8 h-8'} rounded-lg border-2 border-white/30 shadow-2xl z-20 transition-all">` : ''}
+                            ${isRandom ? '<div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[7px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg z-30 whitespace-nowrap">🎲 RANDOM</div>' : ''}
                         </div>
                         <div class="text-center overflow-hidden w-full px-1">
-                            <p class="${activePlayerSlot?'text-[11px] text-amber-500':'text-[9px] text-slate-200'} font-black truncate uppercase leading-none">${h ? h.name : '...'}</p>
-                            <p class="${activePlayerSlot?'text-[10px] text-white':'text-[8px] text-slate-500'} font-bold truncate mt-1 leading-none uppercase">${p ? p.name : ''}</p>
+                            <p class="${activePlayerSlot?'text-[12px] text-amber-500':'text-[10px] text-slate-100'} font-black truncate uppercase leading-tight">${h ? h.name : '...'}</p>
+                            <p class="${activePlayerSlot?'text-[11px] text-white':'text-[9px] text-slate-500'} font-bold truncate mt-1 leading-none uppercase">${p ? p.name : ''}</p>
                         </div>
                     </div>`;
                 }).join('');
@@ -562,6 +564,8 @@
             const elapsed = now - roomData.timerStart;
 
             const teamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
+            const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
+            const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
             const allInTeamVoted = roomData.stage === 'banning' && teamMembers.length > 0 && teamMembers.every(p => roomData.votes[p.uid]);
 
             // Bot actions (admin-only)
@@ -590,8 +594,8 @@
                 }
             }
 
-            // Step 3: Admin immediately finalizes when all team members have voted — zero writes
-            if (isAdmin() && allInTeamVoted && !_finalizingTurn) { finalizeTurn(); return; }
+            // Step 3: Admin immediately finalizes when all team members voted for the SAME hero
+            if (isAdmin() && allInTeamVoted && allVotedSame && !_finalizingTurn) { finalizeTurn(); return; }
 
             // Bug fix: Admin detects when all picks are done (e.g. a non-host made the last pick).
             // confirmPickAction only calls finalizeTurn() if isAdmin(), so the host must watch for completion.
@@ -608,10 +612,8 @@
                 return;
             }
 
-            // Step 3: Local visual acceleration when unanimous vote — NO writes
-            const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
-            const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
-            const speedMul = (roomData.stage === 'banning' && allVotedSame) ? 4 : 1;
+            // Step 3: Local visual acceleration when everyone has voted — NO writes
+            const speedMul = (roomData.stage === 'banning' && allInTeamVoted) ? 4 : 1;
             const rawLeft = Math.max(0, currentTurnMax - elapsed * speedMul);
 
             const leftSec = Math.ceil(rawLeft / 1000);
