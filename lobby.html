@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Drafter (v8.20 Fixed)</title>
+    <title>Dota 2 Drafter (v9.0 Optimized)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -14,7 +14,7 @@
         .group:hover .hero-img { transform: scale(1.05); }
         
         @keyframes text-shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        .text-shimmer { background: linear-gradient(90deg, #fff, #4ade80, #fff); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
+        .text-shimmer { background: linear-gradient(90deg, #fff, #4ade80, #fff); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: text-shimmer 3s linear infinite; }
         
         .team-card { background: rgba(21, 23, 30, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
         .slot-box { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px dashed rgba(255,255,255,0.1); height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 1rem; position: relative; overflow: hidden; }
@@ -86,7 +86,7 @@
             appId: "1:599943765176:web:321689096ad8c008fe284d" 
         };
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
-        const appId = "dota-drafter-pro-v8"; 
+        const appId = "dota-drafter-pro-v9"; // v9: slim data format, local-first setup
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -97,18 +97,30 @@
         const CDN_BASE = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/";
 
         let localUser = { name: '', uid: '', photo: '', team: 'unassigned' };
+        // v9 slim data: pool/picksRadiant/picksDire = [heroId,...], bans = [{i:heroId, t:team},...]
+        // timerStart replaces timerEnd; excludedHeroIds/customHeroPositions removed from DB
         let roomData = { 
             id: '', stage: 'entry', players: [], hostUid: '', 
             nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: [], 
-            bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerEnd: 0, isExtraTime: false, votes: {}, 
+            bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {}, 
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5, 
-            excludedHeroIds: [], pendingHeroId: null, customHeroPositions: {},
-            pickDuration: 20, infinitePickTime: false
+            pendingHeroId: null, pickDuration: 20, infinitePickTime: false
         };
         let isLocalMode = false;
         let poolAnimationPlayed = true; 
         let botActionTimeout = null;
         let tagManagerScrollTop = 0;
+
+        // Step 1: Local-First Setup — never synced to Firestore
+        let localSetupPositions = {}; // { heroId: [pos,...] } override per-hero
+        let localExcludedIds = new Set(); // excluded hero IDs
+
+        // Step 2: Debounce state
+        let _debounceTimer = null;
+        let _pendingUpdate = {};
+
+        // Step 3: Guard against duplicate finalizeTurn
+        let _finalizingTurn = false;
 
         const POS_LABELS = ["Pos 1 (Carry)", "Pos 2 (Mid)", "Pos 3 (Offlane)", "Pos 4 (Soft Supp)", "Pos 5 (Hard Supp)"];
 
@@ -116,7 +128,10 @@
             { id: 1, name: "Abaddon", imgName: "abaddon", positions: [3, 5] }, { id: 2, name: "Alchemist", imgName: "alchemist", positions: [1, 2] }, { id: 3, name: "Ancient Apparition", imgName: "ancient_apparition", positions: [4, 5] }, { id: 4, name: "Anti-Mage", imgName: "antimage", positions: [1] }, { id: 5, name: "Arc Warden", imgName: "arc_warden", positions: [1, 2] }, { id: 6, name: "Axe", imgName: "axe", positions: [3] }, { id: 7, name: "Bane", imgName: "bane", positions: [5] }, { id: 8, name: "Batrider", imgName: "batrider", positions: [2, 3] }, { id: 9, name: "Beastmaster", imgName: "beastmaster", positions: [3] }, { id: 10, name: "Bloodseeker", imgName: "bloodseeker", positions: [1, 2] }, { id: 11, name: "Bounty Hunter", imgName: "bounty_hunter", positions: [4] }, { id: 12, name: "Brewmaster", imgName: "brewmaster", positions: [3] }, { id: 13, name: "Bristleback", imgName: "bristleback", positions: [1, 3] }, { id: 14, name: "Broodmother", imgName: "broodmother", positions: [2, 3] }, { id: 15, name: "Centaur", imgName: "centaur", positions: [3] }, { id: 16, name: "Chaos Knight", imgName: "chaos_knight", positions: [1] }, { id: 17, name: "Chen", imgName: "chen", positions: [5] }, { id: 18, name: "Clinkz", imgName: "clinkz", positions: [1, 4] }, { id: 19, name: "Clockwerk", imgName: "rattletrap", positions: [4, 5] }, { id: 20, name: "Crystal Maiden", imgName: "crystal_maiden", positions: [5] }, { id: 21, name: "Dark Seer", imgName: "dark_seer", positions: [3] }, { id: 22, name: "Dark Willow", imgName: "dark_willow", positions: [4, 5] }, { id: 23, name: "Dawnbreaker", imgName: "dawnbreaker", positions: [3, 4] }, { id: 24, name: "Dazzle", imgName: "dazzle", positions: [2, 5] }, { id: 25, name: "Death Prophet", imgName: "death_prophet", positions: [2, 3] }, { id: 26, name: "Disruptor", imgName: "disruptor", positions: [5] }, { id: 27, name: "Doom", imgName: "doom_bringer", positions: [3, 4] }, { id: 28, name: "Dragon Knight", imgName: "dragon_knight", positions: [2, 3] }, { id: 29, name: "Drow Ranger", imgName: "drow_ranger", positions: [1] }, { id: 30, name: "Earth Spirit", imgName: "earth_spirit", positions: [4] }, { id: 31, name: "Earthshaker", imgName: "earthshaker", positions: [4, 3] }, { id: 32, name: "Elder Titan", imgName: "elder_titan", positions: [4, 5] }, { id: 33, name: "Ember Spirit", imgName: "ember_spirit", positions: [2] }, { id: 34, name: "Enchantress", imgName: "enchantress", positions: [5, 4] }, { id: 35, name: "Enigma", imgName: "enigma", positions: [3, 4] }, { id: 36, name: "Faceless Void", imgName: "faceless_void", positions: [1] }, { id: 37, name: "Grimstroke", imgName: "grimstroke", positions: [4, 5] }, { id: 38, name: "Gyrocopter", imgName: "gyrocopter", positions: [1, 4] }, { id: 39, name: "Hoodwink", imgName: "hoodwink", positions: [4] }, { id: 40, name: "Huskar", imgName: "huskar", positions: [2] }, { id: 41, name: "Invoker", imgName: "invoker", positions: [2] }, { id: 42, name: "Io", imgName: "wisp", positions: [5, 4] }, { id: 43, name: "Jakiro", imgName: "jakiro", positions: [5, 4] }, { id: 44, name: "Juggernaut", imgName: "juggernaut", positions: [1] }, { id: 45, name: "KOTL", imgName: "keeper_of_the_light", positions: [4, 5] }, { id: 46, name: "Kunkka", imgName: "kunkka", positions: [2, 3] }, { id: 47, name: "Legion", imgName: "legion_commander", positions: [3] }, { id: 48, name: "Leshrac", imgName: "leshrac", positions: [2, 4] }, { id: 49, name: "Lich", imgName: "lich", positions: [5] }, { id: 50, name: "Lifestealer", imgName: "life_stealer", positions: [1] }, { id: 51, name: "Lina", imgName: "lina", positions: [2, 4] }, { id: 52, name: "Lion", imgName: "lion", positions: [5, 4] }, { id: 53, name: "Lone Druid", imgName: "lone_druid", positions: [1, 2, 3] }, { id: 54, name: "Luna", imgName: "luna", positions: [1] }, { id: 55, name: "Lycan", imgName: "lycan", positions: [3] }, { id: 56, name: "Magnus", imgName: "magnataur", positions: [3, 2] }, { id: 57, name: "Marci", imgName: "marci", positions: [4, 3] }, { id: 58, name: "Mars", imgName: "mars", positions: [3] }, { id: 59, name: "Medusa", imgName: "medusa", positions: [1] }, { id: 60, name: "Meepo", imgName: "meepo", positions: [1, 2] }, { id: 61, name: "Mirana", imgName: "mirana", positions: [4] }, { id: 62, name: "Monkey King", imgName: "monkey_king", positions: [1, 2] }, { id: 63, name: "Morphling", imgName: "morphling", positions: [1] }, { id: 64, name: "Muerta", imgName: "muerta", positions: [1, 2] }, { id: 65, name: "Naga Siren", imgName: "naga_siren", positions: [1, 4] }, { id: 66, name: "Nature", imgName: "furion", positions: [3, 2, 4, 5] }, { id: 67, name: "Necrophos", imgName: "necrolyte", positions: [2, 3] }, { id: 68, name: "Night Stalker", imgName: "night_stalker", positions: [3] }, { id: 69, name: "Nyx", imgName: "nyx_assassin", positions: [4] }, { id: 70, name: "Ogre Magi", imgName: "ogre_magi", positions: [5] }, { id: 71, name: "Omniknight", imgName: "omniknight", positions: [5, 3] }, { id: 72, name: "Oracle", imgName: "oracle", positions: [5] }, { id: 73, name: "OD", imgName: "obsidian_destroyer", positions: [2] }, { id: 74, name: "Pangolier", imgName: "pangolier", positions: [2, 3] }, { id: 75, name: "PA", imgName: "phantom_assassin", positions: [1] }, { id: 76, name: "PL", imgName: "phantom_lancer", positions: [1] }, { id: 77, name: "Phoenix", imgName: "phoenix", positions: [3, 4] }, { id: 78, name: "Primal Beast", imgName: "primal_beast", positions: [2, 3] }, { id: 79, name: "Puck", imgName: "puck", positions: [2] }, { id: 80, name: "Pudge", imgName: "pudge", positions: [1, 4, 5] }, { id: 81, name: "Pugna", imgName: "pugna", positions: [2, 4, 5] }, { id: 82, name: "QOP", imgName: "queenofpain", positions: [2] }, { id: 83, name: "Razor", imgName: "razor", positions: [1, 3] }, { id: 84, name: "Riki", imgName: "riki", positions: [1, 4] }, { id: 85, name: "Rubick", imgName: "rubick", positions: [4] }, { id: 86, name: "Sand King", imgName: "sand_king", positions: [3, 4] }, { id: 87, name: "Shadow Demon", imgName: "shadow_demon", positions: [5] }, { id: 88, name: "SF", imgName: "nevermore", positions: [2] }, { id: 89, name: "Shadow Shaman", imgName: "shadow_shaman", positions: [5] }, { id: 90, name: "Silencer", imgName: "silencer", positions: [5, 4] }, { id: 91, name: "Skywrath", imgName: "skywrath_mage", positions: [4, 5] }, { id: 92, name: "Slardar", imgName: "slardar", positions: [3] }, { id: 93, name: "Slark", imgName: "slark", positions: [1] }, { id: 94, name: "Snapfire", imgName: "snapfire", positions: [2, 4] }, { id: 95, name: "Sniper", imgName: "sniper", positions: [1, 2] }, { id: 96, name: "Spectre", imgName: "spectre", positions: [1] }, { id: 97, name: "Spirit Breaker", imgName: "spirit_breaker", positions: [3, 4] }, { id: 98, name: "Storm Spirit", imgName: "storm_spirit", positions: [2] }, { id: 99, name: "Sven", imgName: "sven", positions: [1, 3] }, { id: 100, name: "Techies", imgName: "techies", positions: [4] }
         ];
 
-        function getHeroPositions(heroId) { return roomData.customHeroPositions?.[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; }
+        // Step 4: Hydrate a hero ID to full object
+        function getHeroById(id) { return id ? HEROES.find(h => h.id === id) || null : null; }
+        // Step 1: During setup reads local state; outside setup reads HEROES defaults
+        function getHeroPositions(heroId) { return localSetupPositions[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; }
         function getStrategies(r, d) {
             const gen = (p) => { 
                 let s = [], ra = 0, da = 0, ct = 'Radiant'; 
@@ -152,102 +167,135 @@
             } return null;
         }
 
-        const updateRoom = async (u) => { 
+        // Step 2: Debounced updateRoom
+        // immediate=true  → cancel debounce, write now (stage transitions, confirms)
+        // immediate=false → apply locally for instant UI, batch writes with 500ms debounce (votes, picks)
+        const updateRoom = async (u, immediate = false) => { 
             const manager = document.getElementById('hero-tag-manager');
             if (manager) tagManagerScrollTop = manager.scrollTop;
-            if (isLocalMode) { roomData = { ...roomData, ...u }; render(); return; } 
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), u); 
+            if (isLocalMode) { roomData = { ...roomData, ...u }; render(); return; }
+            // Accumulate partial updates and apply optimistically
+            _pendingUpdate = { ..._pendingUpdate, ...u };
+            roomData = { ...roomData, ...u };
+            if (immediate) {
+                if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
+                const toSend = { ..._pendingUpdate };
+                _pendingUpdate = {};
+                render();
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
+            } else {
+                render(); // instant local feedback
+                if (_debounceTimer) clearTimeout(_debounceTimer);
+                _debounceTimer = setTimeout(async () => {
+                    _debounceTimer = null;
+                    const toSend = { ..._pendingUpdate };
+                    _pendingUpdate = {};
+                    if (Object.keys(toSend).length > 0)
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
+                }, 500);
+            }
         };
 
+        // Step 3+4: finalizeTurn uses slim bans {i,t} and timerStart
         const finalizeTurn = async () => {
-            if (!isAdmin()) return;
+            if (!isAdmin() || _finalizingTurn) return;
+            _finalizingTurn = true;
             if (botActionTimeout) { clearTimeout(botActionTimeout); botActionTimeout = null; }
-            
-            if (roomData.stage === 'banning') {
-                const teamVotes = Object.entries(roomData.votes || {}).filter(([uid]) => {
-                    const p = roomData.players.find(x => x.uid === uid);
-                    return p && p.team === roomData.currentTurnTeam;
-                }).map(([, hid]) => hid);
-                
-                let winnerId = null;
-                if (teamVotes.length === 0) {
-                    const avail = roomData.pool.filter(h => !roomData.bans.find(b=>b.id===h.id));
-                    winnerId = avail[Math.floor(Math.random() * avail.length)].id;
-                } else {
-                    const counts = {}; teamVotes.forEach(id => counts[id] = (counts[id] || 0) + 1);
-                    const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
-                    winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
+            try {
+                if (roomData.stage === 'banning') {
+                    const teamVotes = Object.entries(roomData.votes || {}).filter(([uid]) => {
+                        const p = roomData.players.find(x => x.uid === uid);
+                        return p && p.team === roomData.currentTurnTeam;
+                    }).map(([, hid]) => hid);
+                    let winnerId = null;
+                    if (teamVotes.length === 0) {
+                        const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id));
+                        winnerId = avail[Math.floor(Math.random() * avail.length)];
+                    } else {
+                        const counts = {}; teamVotes.forEach(id => counts[id] = (counts[id] || 0) + 1);
+                        const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
+                        winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
+                    }
+                    // Slim ban format: {i: heroId, t: teamName}
+                    const newBans = [...(roomData.bans || []), { i: winnerId, t: roomData.currentTurnTeam }];
+                    const rBMade = newBans.filter(b => b.t === 'Radiant').length;
+                    const dBMade = newBans.filter(b => b.t === 'Dire').length;
+                    if (rBMade >= roomData.bansRadiant && dBMade >= roomData.bansDire) {
+                        await updateRoom({ bans: newBans, stage: 'picking', timerStart: Date.now(), isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null }, true);
+                    } else {
+                        let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (newBans.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
+                        await updateRoom({ bans: newBans, currentTurnTeam: nextT, timerStart: Date.now(), isExtraTime: false, votes: {} }, true);
+                    }
+                } else if (roomData.stage === 'picking') {
+                    const total = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+                    const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
+                    if (total >= totalExpected) {
+                        await updateRoom({ stage: 'result' }, true);
+                    } else {
+                        let acc = 0, nextTeam = 'Radiant';
+                        for(let step of roomData.draftSequence) { acc += step.count; if(total < acc) { nextTeam = step.team; break; } }
+                        await updateRoom({ currentTurnTeam: nextTeam, timerStart: Date.now(), isExtraTime: false, pendingHeroId: null }, true);
+                    }
                 }
-                const newBans = [...(roomData.bans || []), { ...roomData.pool.find(h => h.id === winnerId), team: roomData.currentTurnTeam }];
-                const rBMade = newBans.filter(b => b.team === 'Radiant').length, dBMade = newBans.filter(b => b.team === 'Dire').length;
-                
-                if (rBMade >= roomData.bansRadiant && dBMade >= roomData.bansDire) {
-                    await updateRoom({ bans: newBans, stage: 'picking', timerEnd: Date.now() + getTurnDuration('picking'), isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null });
-                } else {
-                    let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (newBans.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
-                    await updateRoom({ bans: newBans, currentTurnTeam: nextT, timerEnd: Date.now() + getTurnDuration('banning'), isExtraTime: false, votes: {} });
-                }
-
-            } else if (roomData.stage === 'picking') {
-                const total = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
-                const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
-                if (total >= totalExpected) {
-                    await updateRoom({ stage: 'result' });
-                } else {
-                    let acc = 0, nextTeam = 'Radiant';
-                    for(let step of roomData.draftSequence) { acc += step.count; if(total < acc) { nextTeam = step.team; break; } }
-                    await updateRoom({ currentTurnTeam: nextTeam, timerEnd: Date.now() + getTurnDuration('picking'), isExtraTime: false, pendingHeroId: null });
-                }
-            }
+            } finally { _finalizingTurn = false; }
         };
 
         window.loginWithGoogle = async () => { try { await signInWithPopup(auth, provider); isLocalMode = false; } catch (e) { console.error(e); } };
         window.loginOfflineAction = () => { isLocalMode = true; localUser = { uid: "local_" + Math.random().toString(36).substr(2, 4), name: "Player", photo: `https://api.dicebear.com/7.x/avataaars/svg?seed=offline` }; joinRoom("OFFLINE_1"); };
         window.logoutAction = async () => { if (!isLocalMode) await signOut(auth); window.location.reload(); };
         window.joinRoomAction = () => joinRoom(document.getElementById('room-code-input')?.value.trim().toUpperCase() || "BATTLE");
-        window.addBotAction = async () => { if (!isAdmin()) return; const botId = 'bot_' + Math.random().toString(36).substr(2, 9); updateRoom({ players: [...roomData.players, { uid: botId, name: "Bot " + Math.floor(Math.random()*99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 }] }); };
-        window.joinTeamAction = async (team, slot) => { const players = [...roomData.players]; const idx = players.findIndex(p => p.uid === localUser.uid); if (idx === -1 || (team !== 'unassigned' && players.find(p => p.team === team && p.slot === slot))) return; players[idx].team = team; players[idx].slot = slot; updateRoom({ players }); };
-        window.shuffleAction = async () => { if (!isAdmin()) return; let p = [...roomData.players].sort(() => Math.random() - 0.5); const tR = Math.ceil(p.length / 2); let cR = 0, cD = 0; p.forEach(pl => { if (cR < tR && cR < 5) { pl.team = 'Radiant'; pl.slot = cR++; } else if (cD < 5) { pl.team = 'Dire'; pl.slot = cD++; } else { pl.team = 'unassigned'; pl.slot = -1; } }); updateRoom({ players: p }); };
-        window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }); };
-        window.updateNValue = async (i, v) => { if (!isAdmin()) return; let n = [...roomData.nValues]; n[i] = parseInt(v) || 0; updateRoom({ nValues: n }); };
-        window.toggleHeroPosition = async (heroId, pos) => { if (!isAdmin()) return; const custom = { ...roomData.customHeroPositions }; let cur = custom[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; custom[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos]; updateRoom({ customHeroPositions: custom }); };
-        window.toggleExcludeHero = async (id) => { if (!isAdmin()) return; const current = roomData.excludedHeroIds || []; updateRoom({ excludedHeroIds: current.includes(id) ? current.filter(x => x !== id) : [...current, id] }); };
-        window.confirmTeamsAction = async () => { if (!isAdmin()) return; const r = roomData.players.filter(x => x.team === 'Radiant').length, d = roomData.players.filter(x => x.team === 'Dire').length; updateRoom({ stage: 'init', teamSizeRadiant: r, teamSizeDire: d, draftSequence: getStrategies(r, d)[roomData.strategyIdx].seq }); };
+        window.addBotAction = async () => { if (!isAdmin()) return; const botId = 'bot_' + Math.random().toString(36).substr(2, 9); updateRoom({ players: [...roomData.players, { uid: botId, name: "Bot " + Math.floor(Math.random()*99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 }] }, true); };
+        window.joinTeamAction = async (team, slot) => { const players = [...roomData.players]; const idx = players.findIndex(p => p.uid === localUser.uid); if (idx === -1 || (team !== 'unassigned' && players.find(p => p.team === team && p.slot === slot))) return; players[idx].team = team; players[idx].slot = slot; updateRoom({ players }, true); };
+        window.shuffleAction = async () => { if (!isAdmin()) return; let p = [...roomData.players].sort(() => Math.random() - 0.5); const tR = Math.ceil(p.length / 2); let cR = 0, cD = 0; p.forEach(pl => { if (cR < tR && cR < 5) { pl.team = 'Radiant'; pl.slot = cR++; } else if (cD < 5) { pl.team = 'Dire'; pl.slot = cD++; } else { pl.team = 'unassigned'; pl.slot = -1; } }); updateRoom({ players: p }, true); };
+        window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, true); };
+        window.updateNValue = async (i, v) => { if (!isAdmin()) return; let n = [...roomData.nValues]; n[i] = parseInt(v) || 0; updateRoom({ nValues: n }, true); };
+        // Step 1: Local-only — zero Firestore writes during setup
+        window.toggleHeroPosition = (heroId, pos) => { if (!isAdmin()) return; let cur = localSetupPositions[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; localSetupPositions[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos]; render(); };
+        window.toggleExcludeHero = (id) => { if (!isAdmin()) return; if (localExcludedIds.has(id)) localExcludedIds.delete(id); else localExcludedIds.add(id); render(); };
+        // Step 1: Unified function — computes pool locally, ONE write to start banning
+        window.startDraftAction = async () => {
+            if (!isAdmin()) return;
+            const r = roomData.players.filter(x => x.team === 'Radiant').length;
+            const d = roomData.players.filter(x => x.team === 'Dire').length;
+            const seq = getStrategies(r, d)[roomData.strategyIdx].seq;
+            let pl = []; let used = new Set();
+            roomData.nValues.forEach((n, i) => {
+                const pos = i + 1;
+                HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !localExcludedIds.has(h.id))
+                      .sort(() => 0.5 - Math.random()).slice(0, n)
+                      .forEach(h => { used.add(h.id); pl.push(h.id); }); // IDs only
+            });
+            await updateRoom({ stage: 'banning', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
+                pool: pl, bans: [], picksRadiant: [], picksDire: [],
+                timerStart: Date.now(), isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null }, true);
+        };
         
         window.startOverAction = async () => { 
             if (!isAdmin()) return; 
             const resetPlayers = roomData.players.map(p => ({ ...p, team: 'unassigned', slot: -1 }));
-            await updateRoom({ stage: 'lobby', players: resetPlayers, pool: [], bans: [], picksRadiant: [], picksDire: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerEnd: 0 });
+            localSetupPositions = {}; localExcludedIds = new Set();
+            await updateRoom({ stage: 'lobby', players: resetPlayers, pool: [], bans: [], picksRadiant: [], picksDire: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
         };
 
-        window.startDraftSetup = async () => { if (!isAdmin()) return; updateRoom({ stage: 'setup' }); };
-        
-        window.generatePoolAction = async () => {
-            if (!isAdmin()) return;
-            let pl = []; let used = new Set(); const excluded = new Set(roomData.excludedHeroIds || []);
-            roomData.nValues.forEach((n, i) => { const pos = i + 1; HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excluded.has(h.id)).sort(() => 0.5 - Math.random()).slice(0, n).forEach(h => { used.add(h.id); pl.push(h); }); });
-            updateRoom({ pool: pl, stage: 'banning', bans: [], picksRadiant: [], picksDire: [], timerEnd: Date.now() + getTurnDuration('banning') + ANIM_DELAY, isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant' });
-        };
+        window.startDraftSetup = async () => { if (!isAdmin()) return; localSetupPositions = {}; localExcludedIds = new Set(); updateRoom({ stage: 'setup' }, true); };
         
         window.confirmPickAction = async () => {
             const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
             const hId = roomData.pendingHeroId;
-            const h = roomData.pool.find(x => x.id === hId);
-            if (!h) return;
-            
-            if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), h] });
-            else await updateRoom({ picksDire: [...(roomData.picksDire||[]), h] });
-            
+            if (!roomData.pool.includes(hId)) return;
+            if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), hId] }, true);
+            else await updateRoom({ picksDire: [...(roomData.picksDire||[]), hId] }, true);
             if(isAdmin()) finalizeTurn();
         };
 
         window.randomPickAction = async () => {
             const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
-            const avail = roomData.pool.filter(h => !roomData.bans.find(b=>b.id===h.id) && ![...(roomData.picksRadiant||[]), ...(roomData.picksDire||[])].find(p=>p.id===h.id));
+            // Slim: pool/picks are ID arrays, bans are {i,t}
+            const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !roomData.picksRadiant?.includes(id) && !roomData.picksDire?.includes(id));
             if(avail.length > 0) {
-                const h = avail[Math.floor(Math.random() * avail.length)];
-                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), h], pendingHeroId: h.id });
-                else await updateRoom({ picksDire: [...(roomData.picksDire||[]), h], pendingHeroId: h.id });
+                const hId = avail[Math.floor(Math.random() * avail.length)];
+                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), hId], pendingHeroId: hId }, true);
+                else await updateRoom({ picksDire: [...(roomData.picksDire||[]), hId], pendingHeroId: hId }, true);
                 if(isAdmin()) finalizeTurn();
             }
         };
@@ -257,11 +305,12 @@
             if (roomData.stage === 'banning') {
                 const myT = roomData.players.find(p => p.uid === localUser.uid)?.team;
                 if (myT !== roomData.currentTurnTeam) return;
-                const newVotes = { ...roomData.votes, [localUser.uid]: heroId };
-                await updateRoom({ votes: newVotes });
+                await updateRoom({ votes: { ...roomData.votes, [localUser.uid]: heroId } }); // debounced
             } else if (roomData.stage === 'picking') {
                 const turnP = getCurrentPickPlayer();
-                if (turnP?.uid === localUser.uid && ![...roomData.bans, ...(roomData.picksRadiant||[]), ...(roomData.picksDire||[])].find(x => x.id === heroId)) await updateRoom({ pendingHeroId: heroId });
+                // Slim: check bans by .i and picks as ID arrays
+                if (turnP?.uid === localUser.uid && !roomData.bans.find(b => b.i === heroId) && !roomData.picksRadiant?.includes(heroId) && !roomData.picksDire?.includes(heroId))
+                    await updateRoom({ pendingHeroId: heroId }); // debounced
             }
         };
 
@@ -353,7 +402,7 @@
                         <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[440px] overflow-y-auto p-4 scrollbar-custom">
                             <div class="grid grid-cols-4 gap-3">
                                 ${HEROES.sort((a,b)=>a.name.localeCompare(b.name)).map(h => {
-                                    const hPos = getHeroPositions(h.id); const isExcl = roomData.excludedHeroIds?.includes(h.id);
+                                    const hPos = getHeroPositions(h.id); const isExcl = localExcludedIds.has(h.id);
                                     return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
                                         <div onclick="toggleExcludeHero(${h.id})" class="w-full aspect-[3/4] rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${isExcl?'grayscale border-red-600 opacity-30':'border-white/5 group-hover:border-white/30'}">${getHeroImg(h)}</div>
                                         <div class="flex gap-0.5">${[1,2,3,4,5].map(p => `<span onclick="toggleHeroPosition(${h.id}, ${p})" class="role-tag ${hPos.includes(p)?'active':'inactive'}">${p}</span>`).join('')}</div>
@@ -364,7 +413,7 @@
                     </div>
                 </div>
                 <div class="text-center pt-8">
-                    ${host ? `<button onclick="confirmTeamsAction()" class="px-20 py-5 bg-green-500 text-black rounded-3xl font-black uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" ${!isValid ? 'disabled' : ''}>Generate Heroes List</button>` : `<p class="animate-pulse font-black text-slate-500 uppercase">Wait for host...</p>`}
+                    ${host ? `<button onclick="startDraftAction()" class="px-20 py-5 bg-green-500 text-black rounded-3xl font-black uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" ${!isValid ? 'disabled' : ''}>Generate Heroes List</button>` : `<p class="animate-pulse font-black text-slate-500 uppercase">Wait for host...</p>`}
                 </div>
             </div>`;
             lucide.createIcons();
@@ -377,13 +426,15 @@
             const turnP = getCurrentPickPlayer(), myT = roomData.players.find(p => p.uid === localUser.uid)?.team;
             const isMyTurn = turnP && turnP.uid === localUser.uid;
             const isMyAction = (isB && roomData.currentTurnTeam === myT) || (roomData.stage === 'picking' && isMyTurn);
-            const sortedPool = [...roomData.pool].sort((a, b) => a.name.localeCompare(b.name));
+            // Step 4: Hydrate pool IDs → hero objects for rendering
+            const hydPool = roomData.pool.map(id => getHeroById(id)).filter(Boolean);
+            const sortedPool = [...hydPool].sort((a, b) => a.name.localeCompare(b.name));
 
             const renderHeroResultEntry = (teamName, size) => {
                 const teamPlayers = roomData.players.filter(p => p.team === teamName).sort((a,b) => a.slot - b.slot);
-                const picks = teamName === 'Radiant' ? roomData.picksRadiant : roomData.picksDire;
+                const pickIds = teamName === 'Radiant' ? roomData.picksRadiant : roomData.picksDire;
                 return Array(size).fill(0).map((_, i) => {
-                    const h = picks[i], p = teamPlayers[i];
+                    const h = getHeroById(pickIds?.[i]), p = teamPlayers[i];
                     return `<div class="flex items-center gap-8 p-6 rounded-[3rem] bg-white/5 border border-white/5 overflow-hidden group">
                         <div class="w-32 h-44 rounded-[2rem] overflow-hidden border-2 border-white/10 shadow-lg">${getHeroImg(h)}</div>
                         <div class="flex-1 text-left">
@@ -394,11 +445,12 @@
                 }).join('');
             };
 
-            const renderSlots = (tN, picks, size) => {
+            const renderSlots = (tN, pickIds, size) => {
                 const tP = roomData.players.filter(p => p.team === tN).sort((a,b) => a.slot - b.slot);
                 return Array(size).fill(0).map((_, i) => {
-                    const h = picks[i], p = tP[i], activePlayerSlot = (roomData.stage === 'picking' && turnP && p && p.uid === turnP.uid);
-                    const actSlotIdx = roomData.stage === 'picking' && roomData.currentTurnTeam === tN && (picks?.length || 0) === i;
+                    const h = getHeroById(pickIds?.[i]), p = tP[i];
+                    const activePlayerSlot = (roomData.stage === 'picking' && turnP && p && p.uid === turnP.uid);
+                    const actSlotIdx = roomData.stage === 'picking' && roomData.currentTurnTeam === tN && (pickIds?.length || 0) === i;
                     return `<div class="flex flex-col items-center gap-2">
                         <div class="slot-box w-full bg-black/50 overflow-hidden ${activePlayerSlot ? 'active-picker-slot' : (actSlotIdx ? 'border-amber-500/20' : 'border-white/5')}">
                             ${getHeroImg(h)}
@@ -415,7 +467,7 @@
             if (isR) {
                 c.innerHTML = `<div class="space-y-12 animate-in slide-in-from-bottom duration-1000"><div class="text-center space-y-2"><div class="text-amber-500 font-black text-8xl italic animate-pulse uppercase tracking-tighter">BATTLE START</div></div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-12"><div><h3 class="text-3xl font-black text-green-500 uppercase mb-8">Radiant</h3><div class="space-y-4">${renderHeroResultEntry('Radiant', roomData.teamSizeRadiant)}</div></div><div><h3 class="text-3xl font-black text-red-600 uppercase mb-8 text-right">Dire</h3><div class="space-y-4">${renderHeroResultEntry('Dire', roomData.teamSizeDire)}</div></div></div>
-                    <div class="pt-12 border-t border-white/5"><h3 class="text-[10px] font-black text-slate-600 uppercase mb-6 tracking-widest text-center">Remaining Hero Pool</h3><div class="flex gap-3 overflow-x-auto pb-6 scrollbar-hide px-8">${sortedPool.filter(h => ![...roomData.bans, ...(roomData.picksRadiant||[]), ...(roomData.picksDire||[])].some(x=>x.id===h.id)).map(h => `<div class="w-24 h-32 shrink-0 rounded-[1.5rem] border-2 border-white/10 overflow-hidden grayscale opacity-20">${getHeroImg(h)}</div>`).join('')}</div></div>
+                    <div class="pt-12 border-t border-white/5"><h3 class="text-[10px] font-black text-slate-600 uppercase mb-6 tracking-widest text-center">Remaining Hero Pool</h3><div class="flex gap-3 overflow-x-auto pb-6 scrollbar-hide px-8">${sortedPool.filter(h => !roomData.bans.find(b => b.i === h.id) && !roomData.picksRadiant?.includes(h.id) && !roomData.picksDire?.includes(h.id)).map(h => `<div class="w-24 h-32 shrink-0 rounded-[1.5rem] border-2 border-white/10 overflow-hidden grayscale opacity-20">${getHeroImg(h)}</div>`).join('')}</div></div>
                     <div class="flex justify-center pb-12">${isAdmin() ? `<button onclick="startOverAction()" class="px-16 py-5 bg-red-600 text-white rounded-[2rem] font-black uppercase shadow-2xl hover:bg-red-500 transition-all active:scale-95">Reset Draft</button>` : ''}</div></div>`;
             } else {
                 c.innerHTML = `<div class="space-y-6">
@@ -433,11 +485,12 @@
                             </div>
                             <div class="mt-4 flex justify-between items-center px-4 w-full">
                                 ${!isB && turnP && (turnP.uid === localUser.uid || (isAdmin() && turnP.uid.startsWith('bot'))) ? `<button onclick="confirmPickAction()" class="px-8 py-4 bg-white text-black rounded-2xl font-black uppercase text-xs hover:bg-slate-200 transition-all ${!roomData.pendingHeroId ? 'opacity-20 pointer-events-none' : 'shadow-xl active:scale-95'}">CONFIRM</button><button onclick="randomPickAction()" class="p-4 bg-white/5 border border-white/10 rounded-2xl text-slate-500 hover:text-white transition-all"><i data-lucide="shuffle" class="w-5 h-5"></i></button>` : `
-                                <div class="w-full"><p class="text-[9px] font-black uppercase text-slate-600 mb-2 tracking-widest uppercase text-center">Progress</p><div class="flex gap-2 justify-center items-center"><div class="flex gap-1">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="ban-quota-slot border-green-500/20">${getHeroImg(roomData.bans.filter(x => x.team === 'Radiant')[i])}</div>`).join('')}</div><div class="w-px h-8 bg-white/5"></div><div class="flex gap-1">${[...Array(roomData.bansDire)].map((_, i) => `<div class="ban-quota-slot border-red-600/20">${getHeroImg(roomData.bans.filter(x => x.team === 'Dire')[i])}</div>`).join('')}</div></div></div>`}
+                                <div class="w-full"><p class="text-[9px] font-black uppercase text-slate-600 mb-2 tracking-widest uppercase text-center">Progress</p><div class="flex gap-2 justify-center items-center"><div class="flex gap-1">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="ban-quota-slot border-green-500/20">${getHeroImg(getHeroById(roomData.bans.filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div><div class="w-px h-8 bg-white/5"></div><div class="flex gap-1">${[...Array(roomData.bansDire)].map((_, i) => `<div class="ban-quota-slot border-red-600/20">${getHeroImg(getHeroById(roomData.bans.filter(x => x.t === 'Dire')[i]?.i))}</div>`).join('')}</div></div></div>`}
                             </div>
                         </div><div class="team-card p-8 rounded-[3rem] border-4 transition-all duration-700 ${roomData.currentTurnTeam==='Dire'?'border-red-600':'border-transparent'}"><h3 class="text-2xl font-black text-red-600 mb-6 italic text-right uppercase text-center">DIRE</h3><div class="grid grid-cols-5 gap-3">${renderSlots('Dire', roomData.picksDire, roomData.teamSizeDire)}</div></div></div>
                     <div class="bg-[#15171e] p-8 rounded-[4rem] border border-white/5 shadow-2xl relative"><div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-x-6 gap-y-10">${sortedPool.map((h, idx) => {
-                        const isBan = roomData.bans.find(x=>x.id===h.id), isPick = [...(roomData.picksRadiant||[]), ...(roomData.picksDire||[])].find(x=>x.id===h.id);
+                        const isBan = roomData.bans.find(x => x.i === h.id);
+                        const isPick = roomData.picksRadiant?.includes(h.id) || roomData.picksDire?.includes(h.id);
                         const activeTeamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
                         const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
                         const bSize = 8 + (vCount * 4); 
@@ -468,18 +521,22 @@
             }
         };
 
+        // Step 3: Timestamp-based timer — ZERO writes for time management
+        // timerStart is the epoch ms when the turn started.
+        // rawLeft = duration - elapsed. Visual acceleration when allVotedSame (no writes).
         const timerLogic = () => {
-            if (!roomData.timerEnd || roomData.stage === 'result' || roomData.stage === 'entry' || roomData.stage === 'lobby' || roomData.stage === 'setup' || !poolAnimationPlayed) return;
+            if (!roomData.timerStart || roomData.stage === 'result' || roomData.stage === 'entry' || roomData.stage === 'lobby' || roomData.stage === 'setup' || !poolAnimationPlayed) return;
             
             const now = Date.now();
-            let rawLeft = Math.max(0, roomData.timerEnd - now);
             const baseDur = getTurnDuration(roomData.stage);
             const extraDur = 10000;
             const currentTurnMax = roomData.isExtraTime ? extraDur : baseDur;
+            const elapsed = now - roomData.timerStart;
 
             const teamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
-            const allInTeamVotedForBan = roomData.stage === 'banning' && (teamMembers.length > 0 && teamMembers.every(p => roomData.votes[p.uid]));
+            const allInTeamVoted = roomData.stage === 'banning' && teamMembers.length > 0 && teamMembers.every(p => roomData.votes[p.uid]);
 
+            // Bot actions (admin-only)
             if (isAdmin() && !botActionTimeout) {
                 if (roomData.stage === 'banning') {
                     const bots = teamMembers.filter(p => p.uid.startsWith('bot') && !roomData.votes[p.uid]);
@@ -490,8 +547,9 @@
                         if (teamVotes.length > 0 && Math.random() < 0.4) {
                             chosenId = teamVotes[Math.floor(Math.random() * teamVotes.length)];
                         } else {
-                            const avail = roomData.pool.filter(x => !roomData.bans.find(b=>b.id===x.id) && !teamVotes.includes(x.id));
-                            chosenId = (avail.length > 0 ? avail : roomData.pool)[Math.floor(Math.random() * Math.min(avail.length || 1, 5))].id;
+                            // Step 4: pool is ID array, bans use .i
+                            const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !teamVotes.includes(id));
+                            chosenId = (avail.length > 0 ? avail : roomData.pool)[Math.floor(Math.random() * Math.min(avail.length || 1, 5))];
                         }
                         await updateRoom({ votes: { ...roomData.votes, [botUid]: chosenId } });
                         botActionTimeout = null;
@@ -504,21 +562,21 @@
                 }
             }
 
+            // Step 3: Admin immediately finalizes when all team members have voted — zero writes
+            if (isAdmin() && allInTeamVoted && !_finalizingTurn) { finalizeTurn(); return; }
+
             if (roomData.infinitePickTime && roomData.stage === 'picking') {
-                 if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = "--";
-                 const progress = document.getElementById('timer-progress');
-                 if (progress) progress.style.strokeDashoffset = 0;
-                 return;
+                if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = "--";
+                const progress = document.getElementById('timer-progress');
+                if (progress) progress.style.strokeDashoffset = 0;
+                return;
             }
 
-            if (roomData.stage === 'banning') {
-                const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
-                const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
-                if (allVotedSame) {
-                    const delta = 250; if (isAdmin()) updateRoom({ timerEnd: roomData.timerEnd - delta });
-                    rawLeft -= delta;
-                }
-            }
+            // Step 3: Local visual acceleration when unanimous vote — NO writes
+            const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
+            const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
+            const speedMul = (roomData.stage === 'banning' && allVotedSame) ? 4 : 1;
+            const rawLeft = Math.max(0, currentTurnMax - elapsed * speedMul);
 
             const leftSec = Math.ceil(rawLeft / 1000);
             if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = leftSec;
@@ -528,20 +586,26 @@
                 progress.style.strokeDashoffset = 283 - (283 * ratio);
             }
 
-            if (leftSec <= 0 && isAdmin()) {
+            if (leftSec <= 0 && isAdmin() && !_finalizingTurn) {
                 if (roomData.isExtraTime) {
-                    if(roomData.stage === 'picking') {
-                        if(roomData.pendingHeroId) confirmPickAction(); else randomPickAction();
+                    if (roomData.stage === 'picking') {
+                        if (roomData.pendingHeroId) confirmPickAction(); else randomPickAction();
                     } else finalizeTurn();
                 } else {
-                    if (roomData.stage === 'banning' && allInTeamVotedForBan) finalizeTurn();
-                    else updateRoom({ timerEnd: now + extraDur, isExtraTime: true });
+                    if (roomData.stage === 'banning' && allInTeamVoted) finalizeTurn();
+                    // Step 3: grant extra time with a timerStart reset — ONE write, not repeated
+                    else updateRoom({ timerStart: now, isExtraTime: true }, true);
                 }
             }
         };
 
         const joinRoom = async (code) => {
-            const initD = { id: code, stage: 'lobby', players: [{...localUser, team: 'unassigned', slot: -1}], hostUid: localUser.uid, nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [], teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerEnd: 0, isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', excludedHeroIds: [], pendingHeroId: null, customHeroPositions: {}, pickDuration: 20, infinitePickTime: false };
+            // Slim initD: no excludedHeroIds/customHeroPositions, timerStart instead of timerEnd
+            const initD = { id: code, stage: 'lobby', players: [{...localUser, team: 'unassigned', slot: -1}], hostUid: localUser.uid,
+                nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [],
+                teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
+                strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant',
+                pendingHeroId: null, pickDuration: 20, infinitePickTime: false };
             if (isLocalMode) { roomData = initD; render(); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
             try {
@@ -559,7 +623,8 @@
                         const newData = d.data();
                         const oldStage = roomData.stage;
                         roomData = newData;
-                        if (oldStage === 'setup' && roomData.stage === 'init') {
+                        // Step 1: pool animation triggers on setup→banning (no more 'init' stage)
+                        if (oldStage === 'setup' && roomData.stage === 'banning') {
                             poolAnimationPlayed = false;
                         }
                         render(); 
