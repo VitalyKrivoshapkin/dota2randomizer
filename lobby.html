@@ -296,6 +296,7 @@
 
         // Step 3: Guard against duplicate finalizeTurn
         let _finalizingTurn = false;
+        let _actionLock = false;
 
         const POS_LABELS = ["Pos 1 (Carry)", "Pos 2 (Mid)", "Pos 3 (Offlane)", "Pos 4 (Soft Supp)", "Pos 5 (Hard Supp)"];
 
@@ -468,24 +469,31 @@
         };
 
         window.confirmPickAction = async () => {
+            if (_actionLock) return;
             const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
             const hId = roomData.pendingHeroId;
             if (!roomData.pool.includes(hId)) return;
-            if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant || []), hId] }, true);
-            else await updateRoom({ picksDire: [...(roomData.picksDire || []), hId] }, true);
-            if (isAdmin()) finalizeTurn();
+            _actionLock = true;
+            try {
+                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant || []), hId], pendingHeroId: null }, true);
+                else await updateRoom({ picksDire: [...(roomData.picksDire || []), hId], pendingHeroId: null }, true);
+                if (isAdmin()) await finalizeTurn();
+            } finally { _actionLock = false; }
         };
 
         window.randomPickAction = async () => {
+            if (_actionLock) return;
             const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
-            // Slim: pool/picks are ID arrays, bans are {i,t}
             const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !roomData.picksRadiant?.includes(id) && !roomData.picksDire?.includes(id));
             if (avail.length > 0) {
-                const hId = avail[Math.floor(Math.random() * avail.length)];
-                const newRandomIds = [...(roomData.randomPickIds || []), hId];
-                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant || []), hId], pendingHeroId: hId, randomPickIds: newRandomIds }, true);
-                else await updateRoom({ picksDire: [...(roomData.picksDire || []), hId], pendingHeroId: hId, randomPickIds: newRandomIds }, true);
-                if (isAdmin()) finalizeTurn();
+                _actionLock = true;
+                try {
+                    const hId = avail[Math.floor(Math.random() * avail.length)];
+                    const newRandomIds = [...(roomData.randomPickIds || []), hId];
+                    if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant || []), hId], pendingHeroId: null, randomPickIds: newRandomIds }, true);
+                    else await updateRoom({ picksDire: [...(roomData.picksDire || []), hId], pendingHeroId: null, randomPickIds: newRandomIds }, true);
+                    if (isAdmin()) await finalizeTurn();
+                } finally { _actionLock = false; }
             }
         };
 
@@ -554,12 +562,12 @@
             const posCounts = [1, 2, 3, 4, 5].map(p => HEROES.filter(h => getHeroPositions(h.id).includes(p) && !localExcludedIds.has(h.id)).length);
 
             c.innerHTML = `<div class="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
-                <div class="text-center relative">
+                <div class="text-center relative flex items-center justify-between pb-4 border-b border-white/5 mb-8">
                     <h2 class="text-4xl font-black italic uppercase">Draft Configuration</h2>
-                    <div class="absolute top-1/2 -translate-y-1/2 right-0 flex gap-4">
-                        <div class="text-right"><p class="text-[8px] font-black text-green-500 uppercase leading-none">Radiant</p><p class="text-lg font-black italic leading-none">${rPlayers}</p></div>
-                        <div class="w-px h-8 bg-white/10"></div>
-                        <div class="text-left"><p class="text-[8px] font-black text-red-500 uppercase leading-none">Dire</p><p class="text-lg font-black italic leading-none">${dPlayers}</p></div>
+                    <div class="flex items-center gap-6 bg-black/40 px-6 py-3 rounded-[1.5rem] border border-white/5 shadow-xl">
+                        <div class="flex flex-col items-end justify-center"><p class="text-[10px] font-black text-green-500 uppercase leading-none tracking-widest mb-1.5">Radiant</p><p class="text-3xl font-black italic leading-none text-white">${rPlayers}</p></div>
+                        <div class="w-px h-10 bg-white/10"></div>
+                        <div class="flex flex-col items-start justify-center"><p class="text-[10px] font-black text-red-500 uppercase leading-none tracking-widest mb-1.5">Dire</p><p class="text-3xl font-black italic leading-none text-white">${dPlayers}</p></div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -902,7 +910,7 @@
                 progress.style.strokeDashoffset = 283 - (283 * ratio);
             }
 
-            if (leftSec <= 0 && isAdmin() && !_finalizingTurn) {
+            if (leftSec <= 0 && isAdmin() && !_finalizingTurn && !_actionLock) {
                 if (roomData.isExtraTime) {
                     if (roomData.stage === 'picking') {
                         if (roomData.pendingHeroId) confirmPickAction(); else randomPickAction();
