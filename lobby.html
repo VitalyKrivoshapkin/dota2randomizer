@@ -32,10 +32,10 @@
 
         .timer-circle { transition: stroke-dashoffset 0.1s linear; }
         
-        .scrollbar-custom::-webkit-scrollbar { width: 8px; }
+        .scrollbar-custom::-webkit-scrollbar { width: 10px; }
         .scrollbar-custom::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
-        .scrollbar-custom::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; border: 2px solid #1a1d24; }
-        .scrollbar-custom::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        .scrollbar-custom::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 10px; border: 2px solid #1a1d24; }
+        .scrollbar-custom::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
 
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -104,7 +104,7 @@
             nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: [], 
             bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {}, 
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5, 
-            pendingHeroId: null, pickDuration: 20, infinitePickTime: false
+            pendingHeroId: null, pickDuration: 20, infinitePickTime: false, randomPickIds: []
         };
         let isLocalMode = false;
         let poolAnimationPlayed = true; 
@@ -266,7 +266,7 @@
                       .forEach(h => { used.add(h.id); pl.push(h.id); }); // IDs only
             });
             await updateRoom({ stage: 'banning', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
-                pool: pl, bans: [], picksRadiant: [], picksDire: [],
+                pool: pl, bans: [], picksRadiant: [], picksDire: [], randomPickIds: [],
                 timerStart: Date.now(), isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null }, true);
         };
         
@@ -274,7 +274,7 @@
             if (!isAdmin()) return; 
             const resetPlayers = roomData.players.map(p => ({ ...p, team: 'unassigned', slot: -1 }));
             localSetupPositions = {}; localExcludedIds = new Set();
-            await updateRoom({ stage: 'lobby', players: resetPlayers, pool: [], bans: [], picksRadiant: [], picksDire: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
+            await updateRoom({ stage: 'lobby', players: resetPlayers, pool: [], bans: [], picksRadiant: [], picksDire: [], randomPickIds: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
         };
 
         window.startDraftSetup = async () => { if (!isAdmin()) return; localSetupPositions = {}; localExcludedIds = new Set(); updateRoom({ stage: 'setup' }, true); };
@@ -294,8 +294,9 @@
             const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !roomData.picksRadiant?.includes(id) && !roomData.picksDire?.includes(id));
             if(avail.length > 0) {
                 const hId = avail[Math.floor(Math.random() * avail.length)];
-                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), hId], pendingHeroId: hId }, true);
-                else await updateRoom({ picksDire: [...(roomData.picksDire||[]), hId], pendingHeroId: hId }, true);
+                const newRandomIds = [...(roomData.randomPickIds || []), hId];
+                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant||[]), hId], pendingHeroId: hId, randomPickIds: newRandomIds }, true);
+                else await updateRoom({ picksDire: [...(roomData.picksDire||[]), hId], pendingHeroId: hId, randomPickIds: newRandomIds }, true);
                 if(isAdmin()) finalizeTurn();
             }
         };
@@ -325,12 +326,17 @@
 
         const renderLobby = (c) => {
             const players = roomData.players || []; const host = isAdmin();
+            const hostUser = players.find(p => p.uid === roomData.hostUid);
+            const hostName = hostUser ? hostUser.name : 'Host';
+
+            const renderHostBadge = (p) => p.uid === roomData.hostUid ? `<span class="ml-1 bg-amber-500 text-black text-[6px] px-1 rounded-sm font-black">HOST</span>` : '';
+
             c.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom duration-500">
-                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-green-500 mb-6 uppercase">Radiant</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Radiant' && x.slot === i); return `<div onclick="joinTeamAction('Radiant', ${i})" class="slot-box ${p?'player-active border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]':'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}</div>` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
-                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-red-600 mb-6 uppercase text-right">Dire</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Dire' && x.slot === i); return `<div onclick="joinTeamAction('Dire', ${i})" class="slot-box ${p?'player-active border-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.1)]':'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}</div>` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
+                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-green-500 mb-6 uppercase">Radiant</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Radiant' && x.slot === i); return `<div onclick="joinTeamAction('Radiant', ${i})" class="slot-box ${p?'player-active border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]':'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}${renderHostBadge(p)}</div>` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
+                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-red-600 mb-6 uppercase text-right">Dire</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Dire' && x.slot === i); return `<div onclick="joinTeamAction('Dire', ${i})" class="slot-box ${p?'player-active border-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.1)]':'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}${renderHostBadge(p)}</div>` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
                 <div class="lg:col-span-2 flex flex-col md:flex-row gap-6">
-                    <div class="flex-1 p-6 bg-white/5 rounded-3xl border border-white/5 flex flex-wrap gap-3">${players.filter(p => p.team === 'unassigned').map(p => `<div class="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-xl border border-white/5"><img src="${p.photo}" class="w-5 h-5 rounded"><span class="text-[10px] font-bold uppercase">${p.name}</span></div>`).join('')}<div onclick="joinTeamAction('unassigned', -1)" class="w-10 h-10 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:bg-white/5"><i data-lucide="user-minus" class="w-4 h-4 opacity-30"></i></div></div>
-                    <div class="team-card p-6 rounded-[2rem] bg-amber-500/5 border-amber-500/10 flex flex-col gap-3 min-w-[240px]">${host ? `<button onclick="shuffleAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Shuffle Teams</button><button onclick="addBotAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Add Bot</button><button onclick="startDraftSetup()" class="w-full py-4 bg-amber-500 text-black rounded-2xl font-black uppercase text-xs mt-2 transition-all active:scale-95 shadow-lg shadow-amber-500/20">Start</button>` : `<div class="py-4 text-center"><p class="text-[10px] font-black text-slate-600 animate-pulse uppercase">Waiting...</p></div>`}</div>
+                    <div class="flex-1 p-6 bg-white/5 rounded-3xl border border-white/5 flex flex-wrap gap-3">${players.filter(p => p.team === 'unassigned').map(p => `<div class="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-xl border border-white/5"><img src="${p.photo}" class="w-5 h-5 rounded"><span class="text-[10px] font-bold uppercase">${p.name}${renderHostBadge(p)}</span></div>`).join('')}<div onclick="joinTeamAction('unassigned', -1)" class="w-10 h-10 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:bg-white/5"><i data-lucide="user-minus" class="w-4 h-4 opacity-30"></i></div></div>
+                    <div class="team-card p-6 rounded-[2rem] bg-amber-500/5 border-amber-500/10 flex flex-col gap-3 min-w-[240px]">${host ? `<button onclick="shuffleAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Shuffle Teams</button><button onclick="addBotAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Add Bot</button><button onclick="startDraftSetup()" class="w-full py-4 bg-amber-500 text-black rounded-2xl font-black uppercase text-xs mt-2 transition-all active:scale-95 shadow-lg shadow-amber-500/20">Start</button>` : `<div class="py-4 text-center"><p class="text-[10px] font-black text-amber-500/60 uppercase">Host: ${hostName}</p><p class="text-[8px] font-black text-slate-600 animate-pulse uppercase mt-1">Waiting for start...</p></div>`}</div>
                 </div>
             </div>`;
             lucide.createIcons();
@@ -352,7 +358,7 @@
                     <div class="space-y-6">
                         <div class="p-6 bg-white/5 rounded-[2rem] border border-white/5 space-y-6">
                             <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2 text-center">Hero Pool Rows</h3>
-                            <div class="flex gap-2 pb-2 scrollbar-hide overflow-x-auto">${POS_LABELS.map((label, i) => `<div class="flex-1 bg-white/5 p-3 rounded-2xl min-w-[100px]"><p class="text-[8px] font-black text-slate-500 mb-2 uppercase text-center leading-none h-6 flex items-center justify-center">${label}</p><div class="flex items-center justify-between"><button onclick="updateNValue(${i}, ${Math.max(1, roomData.nValues[i]-1)})" class="w-6 h-6 rounded-lg bg-black text-xs">-</button><span class="font-black text-xs">${roomData.nValues[i]}</span><button onclick="updateNValue(${i}, ${roomData.nValues[i]+1})" class="w-6 h-6 rounded-lg bg-black text-xs">+</button></div></div>`).join('')}</div>
+                            <div class="grid grid-cols-5 gap-2 pb-2">${POS_LABELS.map((label, i) => `<div class="bg-white/5 p-3 rounded-2xl"><p class="text-[8px] font-black text-slate-500 mb-2 uppercase text-center leading-none h-6 flex items-center justify-center">${label}</p><div class="flex items-center justify-between"><button onclick="updateNValue(${i}, ${Math.max(1, roomData.nValues[i]-1)})" class="w-6 h-6 rounded-lg bg-black text-xs">-</button><span class="font-black text-xs">${roomData.nValues[i]}</span><button onclick="updateNValue(${i}, ${roomData.nValues[i]+1})" class="w-6 h-6 rounded-lg bg-black text-xs">+</button></div></div>`).join('')}</div>
                             
                             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                                 <div>
@@ -399,7 +405,7 @@
                     </div>
                     <div class="space-y-6">
                         <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">Hero Tag Manager</h3>
-                        <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[440px] overflow-y-auto p-4 scrollbar-custom">
+                        <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                             <div class="grid grid-cols-4 gap-3">
                                 ${HEROES.sort((a,b)=>a.name.localeCompare(b.name)).map(h => {
                                     const hPos = getHeroPositions(h.id); const isExcl = localExcludedIds.has(h.id);
@@ -435,11 +441,12 @@
                 const pickIds = teamName === 'Radiant' ? roomData.picksRadiant : roomData.picksDire;
                 return Array(size).fill(0).map((_, i) => {
                     const h = getHeroById(pickIds?.[i]), p = teamPlayers[i];
+                    const isRandom = roomData.randomPickIds?.includes(pickIds?.[i]);
                     return `<div class="flex items-center gap-8 p-6 rounded-[3rem] bg-white/5 border border-white/5 overflow-hidden group">
-                        <div class="w-32 h-44 rounded-[2rem] overflow-hidden border-2 border-white/10 shadow-lg">${getHeroImg(h)}</div>
+                        <div class="w-32 h-44 rounded-[2rem] overflow-hidden border-2 border-white/10 shadow-lg relative">${getHeroImg(h)}${isRandom ? '<div class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap">🎲 RANDOM</div>' : ''}</div>
                         <div class="flex-1 text-left">
                             <h4 class="text-4xl font-black italic uppercase mb-2 ${teamName==='Radiant'?'text-green-500':'text-red-500'}">${h ? h.name : 'Bot / Empty'}</h4>
-                            <div class="flex items-center gap-4">${p ? `<img src="${p.photo}" class="w-12 h-12 rounded-full border border-white/20"><span class="text-2xl font-bold uppercase text-slate-400">${p.name}</span>` : ''}</div>
+                            <div class="flex items-center gap-4">${p ? `<img src="${p.photo}" class="w-12 h-12 rounded-full border border-white/20"><span class="text-2xl font-bold uppercase text-slate-400">${p.name}</span>` : ''}${isRandom ? '<span class="text-[10px] font-black uppercase bg-amber-500/15 text-amber-400 border border-amber-500/25 px-2 py-1 rounded-lg tracking-widest">🎲 Random</span>' : ''}</div>
                         </div>
                     </div>`;
                 }).join('');
@@ -564,6 +571,14 @@
 
             // Step 3: Admin immediately finalizes when all team members have voted — zero writes
             if (isAdmin() && allInTeamVoted && !_finalizingTurn) { finalizeTurn(); return; }
+
+            // Bug fix: Admin detects when all picks are done (e.g. a non-host made the last pick).
+            // confirmPickAction only calls finalizeTurn() if isAdmin(), so the host must watch for completion.
+            if (isAdmin() && roomData.stage === 'picking' && !_finalizingTurn) {
+                const totalPicks = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+                const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
+                if (totalExpected > 0 && totalPicks >= totalExpected) { finalizeTurn(); return; }
+            }
 
             if (roomData.infinitePickTime && roomData.stage === 'picking') {
                 if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = "--";
