@@ -104,7 +104,8 @@
             nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: [], 
             bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {}, 
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5, 
-            pendingHeroId: null, pickDuration: 20, infinitePickTime: false, randomPickIds: []
+            pendingHeroId: null, pickDuration: 20, infinitePickTime: false, 
+            banDuration: 20, infiniteBanTime: false, randomPickIds: []
         };
         let isLocalMode = false;
         let poolAnimationPlayed = true; 
@@ -146,6 +147,7 @@
         }
         function getTurnDuration(type) { 
             if (type === 'picking') return roomData.infinitePickTime ? 999999999 : (roomData.pickDuration * 1000);
+            if (type === 'banning') return roomData.infiniteBanTime ? 999999999 : (roomData.banDuration * 1000);
             return 15000; 
         }
         function getHeroImg(h) { return h ? `<img src="${CDN_BASE}${h.imgName}.png" class="hero-img" alt="${h.name}" draggable="false">` : ''; }
@@ -352,13 +354,22 @@
             const isValid = totalPool >= neededHeroes;
             const strats = getStrategies(rPlayers, dPlayers); 
             const host = isAdmin();
+            const posCounts = [1,2,3,4,5].map(p => HEROES.filter(h => getHeroPositions(h.id).includes(p) && !localExcludedIds.has(h.id)).length);
+
             c.innerHTML = `<div class="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
-                <div class="text-center"><h2 class="text-4xl font-black italic uppercase">Draft Configuration</h2></div>
+                <div class="text-center relative">
+                    <h2 class="text-4xl font-black italic uppercase">Draft Configuration</h2>
+                    <div class="absolute top-1/2 -translate-y-1/2 right-0 flex gap-4">
+                        <div class="text-right"><p class="text-[8px] font-black text-green-500 uppercase leading-none">Radiant</p><p class="text-lg font-black italic leading-none">${rPlayers}</p></div>
+                        <div class="w-px h-8 bg-white/10"></div>
+                        <div class="text-left"><p class="text-[8px] font-black text-red-500 uppercase leading-none">Dire</p><p class="text-lg font-black italic leading-none">${dPlayers}</p></div>
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div class="space-y-6">
                         <div class="p-6 bg-white/5 rounded-[2rem] border border-white/5 space-y-6">
                             <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2 text-center">Hero Pool Rows</h3>
-                            <div class="grid grid-cols-5 gap-2 pb-2">${POS_LABELS.map((label, i) => `<div class="bg-white/5 p-3 rounded-2xl"><p class="text-[8px] font-black text-slate-500 mb-2 uppercase text-center leading-none h-6 flex items-center justify-center">${label}</p><div class="flex items-center justify-between"><button onclick="updateNValue(${i}, ${Math.max(1, roomData.nValues[i]-1)})" class="w-6 h-6 rounded-lg bg-black text-xs">-</button><span class="font-black text-xs">${roomData.nValues[i]}</span><button onclick="updateNValue(${i}, ${roomData.nValues[i]+1})" class="w-6 h-6 rounded-lg bg-black text-xs">+</button></div></div>`).join('')}</div>
+                            <div class="grid grid-cols-5 gap-2 pb-2">${POS_LABELS.map((label, i) => `<div class="bg-white/5 p-3 rounded-2xl"><p class="text-[8px] font-black text-slate-500 mb-2 uppercase text-center leading-none h-8 flex flex-col items-center justify-center"><span>${label}</span><span class="text-amber-500/50 pt-1">TOTAL: ${posCounts[i]}</span></p><div class="flex items-center justify-between"><button onclick="updateNValue(${i}, ${Math.max(1, roomData.nValues[i]-1)})" class="w-6 h-6 rounded-lg bg-black text-xs">-</button><span class="font-black text-xs">${roomData.nValues[i]}</span><button onclick="updateNValue(${i}, ${roomData.nValues[i]+1})" class="w-6 h-6 rounded-lg bg-black text-xs">+</button></div></div>`).join('')}</div>
                             
                             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                                 <div>
@@ -368,6 +379,16 @@
                                         <label class="flex items-center gap-2 cursor-pointer opacity-80 hover:opacity-100">
                                             <input type="checkbox" ${roomData.infinitePickTime ? 'checked' : ''} onchange="updateField('infinitePickTime', this.checked)" class="w-4 h-4">
                                             <span class="text-[10px] font-black uppercase">No Limit</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-center">
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 text-center">Ban Timer (sec)</h3>
+                                    <div class="flex items-center justify-center gap-3">
+                                        <input type="number" value="${roomData.banDuration}" onchange="updateField('banDuration', parseInt(this.value))" class="bg-black/50 border border-white/10 rounded-xl p-2 w-16 text-center font-black" ${roomData.infiniteBanTime ? 'disabled' : ''}>
+                                        <label class="flex items-center gap-2 cursor-pointer opacity-80 hover:opacity-100">
+                                            <input type="checkbox" ${roomData.infiniteBanTime ? 'checked' : ''} onchange="updateField('infiniteBanTime', this.checked)" class="w-4 h-4">
+                                            <span class="text-[8px] font-black uppercase">No Limit</span>
                                         </label>
                                     </div>
                                 </div>
@@ -620,7 +641,8 @@
                 nValues: [5,5,5,5,5], pool: [], bans: [], picksRadiant: [], picksDire: [],
                 teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
                 strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {}, currentTurnTeam: 'Radiant',
-                pendingHeroId: null, pickDuration: 20, infinitePickTime: false };
+                pendingHeroId: null, pickDuration: 20, infinitePickTime: false,
+                banDuration: 20, infiniteBanTime: false, randomPickIds: [] };
             if (isLocalMode) { roomData = initD; render(); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
             try {
