@@ -417,7 +417,18 @@
             } finally { _finalizingTurn = false; }
         };
 
-        window.loginWithGoogle = async () => { try { await signInWithPopup(auth, provider); isLocalMode = false; } catch (e) { console.error(e); } };
+        window.loginWithGoogle = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+                isLocalMode = false;
+            } catch (error) {
+                if (error.code === 'auth/user-disabled') {
+                    alert("Ваш аккаунт был заблокирован. Пожалуйста, свяжитесь с поддержкой.");
+                } else {
+                    console.error("Ошибка входа:", error.message || error);
+                }
+            }
+        };
         window.loginOfflineAction = () => { isLocalMode = true; localUser = { uid: "local_" + Math.random().toString(36).substr(2, 4), name: "Player", photo: `https://api.dicebear.com/7.x/avataaars/svg?seed=offline` }; joinRoom("OFFLINE_1"); };
         window.logoutAction = async () => { if (!isLocalMode) await signOut(auth); window.location.reload(); };
         window.joinRoomAction = () => joinRoom(document.getElementById('room-code-input')?.value.trim().toUpperCase() || "BATTLE");
