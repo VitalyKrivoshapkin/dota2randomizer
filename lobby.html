@@ -350,22 +350,13 @@
         // Step 2: Debounced updateRoom
         // immediate=true  → cancel debounce, write now (stage transitions, confirms)
         // immediate=false → apply locally for instant UI, batch writes with 500ms debounce (votes, picks)
-        const updateRoom = async (u, immediate = false) => {
-            if (isLocalMode) { 
-                for (let k in u) {
-                    if (k.includes('.')) {
-                        const pts = k.split('.'); let o = roomData;
-                        for (let i = 0; i < pts.length - 1; i++) o = o[pts[i]];
-                        o[pts[pts.length - 1]] = u[k];
-                    } else roomData[k] = u[k];
-                }
-                render(); return; 
-            }
-            
+        // Helper for instant local UI feedback and tracking pending keys
+        const applyOptimistic = (u) => {
+            if (!u) return;
             // 1. Accumulate all updates into _pendingUpdate
             for(let k in u) _pendingUpdate[k] = u[k];
 
-            // 2. Optimistic local update
+            // 2. Optimistic local update of roomData
             for (let k in u) {
                 if (k.includes('.')) {
                     const pts = k.split('.'); let o = roomData;
@@ -373,7 +364,13 @@
                     o[pts[pts.length-1]] = u[k];
                 } else roomData[k] = u[k];
             }
-            render(); 
+            render();
+        };
+
+        const updateRoom = async (u, immediate = false) => {
+            if (isLocalMode) { applyOptimistic(u); return; }
+            
+            applyOptimistic(u);
 
             if (immediate) {
                 if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
@@ -381,7 +378,6 @@
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
                 } finally {
-                    // Clear only confirmed keys
                     for(let k in toSend) { if(_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
                 }
             } else {
@@ -401,14 +397,12 @@
         };
 
         const transactionalUpdateRoom = async (updateFn) => {
-            if (isLocalMode) { const u = updateFn(roomData); if (u) updateRoom(u, true); return; }
+            if (isLocalMode) { const u = updateFn(roomData); applyOptimistic(u); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id);
-            // Optimistic pre-apply
+            // Optimistic pre-apply (only local, no Firestore write scheduled yet)
             const optimistic = updateFn(roomData);
-            if (optimistic) {
-                for(let k in optimistic) _pendingUpdate[k] = optimistic[k];
-                updateRoom(optimistic, false); 
-            }
+            applyOptimistic(optimistic);
+            
             try {
                 await runTransaction(db, async (transaction) => {
                     const snap = await transaction.get(ref);
@@ -417,8 +411,8 @@
                     if (updates) transaction.update(ref, updates);
                 });
             } catch (e) {
-                console.error("Transact fail:", e);
-                alert("Ошибка синхронизации: попробуйте еще раз.");
+                console.warn("Transact conflict/fail:", e);
+                // Silent retry or partial failure handled by onSnapshot
             } finally {
                 if (optimistic) {
                     for(let k in optimistic) { if(_pendingUpdate[k] === optimistic[k]) delete _pendingUpdate[k]; }
