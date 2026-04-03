@@ -274,7 +274,7 @@
         // v9 slim data: pool/picksRadiant/picksDire = [heroId,...], bans = [{i:heroId, t:team},...]
         // timerStart replaces timerEnd; excludedHeroIds/customHeroPositions removed from DB
         let roomData = {
-            id: '', stage: 'entry', players: [], hostUid: '',
+            id: '', stage: 'entry', players: {}, hostUid: '',
             nValues: [5, 5, 5, 5, 5], pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: [],
             bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {},
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5,
@@ -337,7 +337,8 @@
             for (let step of roomData.draftSequence) {
                 acc += step.count;
                 if (totalPicks < acc) {
-                    const teamPlayers = roomData.players.filter(p => p.team === step.team).sort((a, b) => a.slot - b.slot);
+                    const playersArr = Object.values(roomData.players || {});
+                    const teamPlayers = playersArr.filter(p => p.team === step.team).sort((a, b) => a.slot - b.slot);
                     const playerIndex = (step.team === 'Radiant' ? (roomData.picksRadiant?.length || 0) : (roomData.picksDire?.length || 0));
                     return teamPlayers[playerIndex] || null;
                 }
@@ -427,8 +428,9 @@
             if (botActionTimeout) { clearTimeout(botActionTimeout); botActionTimeout = null; }
             try {
                 if (roomData.stage === 'banning') {
+                    const playersArr = Object.values(roomData.players || {});
                     const teamVotes = Object.entries(roomData.votes || {}).filter(([uid]) => {
-                        const p = roomData.players.find(x => x.uid === uid);
+                        const p = playersArr.find(x => x.uid === uid);
                         return p && p.team === roomData.currentTurnTeam;
                     }).map(([, hid]) => hid);
                     let winnerId = null;
@@ -482,71 +484,57 @@
         window.addBotAction = async () => { 
             if (!isAdmin()) return; 
             const botId = 'bot_' + Math.random().toString(36).substr(2, 9); 
-            transactionalUpdateRoom(data => {
-                const p = [...(data.players || [])];
-                p.push({ uid: botId, name: "Bot " + Math.floor(Math.random() * 99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 });
-                return { players: p };
-            });
+            const botUser = { uid: botId, name: "Bot " + Math.floor(Math.random() * 99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 };
+            updateRoom({ [`players.${botId}`]: botUser }, true);
         };
         window.joinTeamAction = async (team, slot) => {
-            transactionalUpdateRoom(data => {
-                const pList = [...(data.players || [])];
-                const meIdx = pList.findIndex(p => p.uid === localUser.uid);
-                if (meIdx === -1) return null;
-                if (team !== 'unassigned' && pList.find(p => p.team === team && p.slot === slot)) return null;
-                pList[meIdx].team = team;
-                pList[meIdx].slot = slot;
-                return { players: pList };
-            });
+            const playersArr = Object.values(roomData.players || {});
+            if (team !== 'unassigned' && playersArr.find(p => p.team === team && p.slot === slot)) return;
+            updateRoom({ 
+                [`players.${localUser.uid}.team`]: team, 
+                [`players.${localUser.uid}.slot`]: slot 
+            }, true);
         };
         window.kickPlayerAction = async (uid) => { 
             if (!isAdmin()) return; 
-            transactionalUpdateRoom(data => {
-                const p = [...(data.players || [])];
-                const idx = p.findIndex(x => x.uid === uid);
-                if (idx > -1) {
-                    p[idx].team = 'unassigned';
-                    p[idx].slot = -1;
-                    return { players: p };
-                }
-                return null;
-            });
+            updateRoom({ 
+                [`players.${uid}.team`]: 'unassigned', 
+                [`players.${uid}.slot`]: -1 
+            }, true);
         };
         window.shuffleAction = async () => { 
             if (!isAdmin()) return; 
-            transactionalUpdateRoom(data => {
-                let pList = [...(data.players || [])];
-                let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
-                let unassigned = pList.filter(p => p.team === 'unassigned');
-                teamPlayers.sort(() => Math.random() - 0.5);
-                let cR = 0, cD = 0;
-                const totalActive = teamPlayers.length;
-                const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
-                teamPlayers.forEach(p => {
-                    if (cR < tR && cR < 5) { p.team = 'Radiant'; p.slot = cR++; }
-                    else if (cD < 5) { p.team = 'Dire'; p.slot = cD++; }
-                    else { p.team = 'unassigned'; p.slot = -1; }
-                });
-                return { players: [...teamPlayers, ...unassigned] };
+            let playersObj = { ...roomData.players };
+            let pList = Object.values(playersObj);
+            let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
+            teamPlayers.sort(() => Math.random() - 0.5);
+            let cR = 0, cD = 0;
+            const totalActive = teamPlayers.length;
+            const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
+            teamPlayers.forEach(p => {
+                if (cR < tR && cR < 5) { p.team = 'Radiant'; p.slot = cR++; }
+                else if (cD < 5) { p.team = 'Dire'; p.slot = cD++; }
+                else { p.team = 'unassigned'; p.slot = -1; }
+                playersObj[p.uid] = { ...p };
             });
+            updateRoom({ players: playersObj }, true);
         };
         window.assignBotAction = async (uid) => { 
             if (!isAdmin()) return; 
-            transactionalUpdateRoom(data => {
-                const pList = [...(data.players || [])];
-                const botIdx = pList.findIndex(p => p.uid === uid);
-                if (botIdx === -1) return null;
-                const occR = pList.filter(p => p.team === 'Radiant');
-                const occD = pList.filter(p => p.team === 'Dire');
-                let poss = [];
-                for(let i=0; i<5; i++) { if(!occR.find(p => p.slot === i)) poss.push({team: 'Radiant', slot: i}); }
-                for(let i=0; i<5; i++) { if(!occD.find(p => p.slot === i)) poss.push({team: 'Dire', slot: i}); }
-                if (poss.length === 0) return null;
-                const choice = poss[Math.floor(Math.random() * poss.length)];
-                pList[botIdx].team = choice.team;
-                pList[botIdx].slot = choice.slot;
-                return { players: pList };
-            });
+            const pList = Object.values(roomData.players || {});
+            const bot = pList.find(p => p.uid === uid);
+            if (!bot) return;
+            const occR = pList.filter(p => p.team === 'Radiant');
+            const occD = pList.filter(p => p.team === 'Dire');
+            let poss = [];
+            for(let i=0; i<5; i++) { if(!occR.find(p => p.slot === i)) poss.push({team: 'Radiant', slot: i}); }
+            for(let i=0; i<5; i++) { if(!occD.find(p => p.slot === i)) poss.push({team: 'Dire', slot: i}); }
+            if (poss.length === 0) return;
+            const choice = poss[Math.floor(Math.random() * poss.length)];
+            updateRoom({ 
+                [`players.${uid}.team`]: choice.team, 
+                [`players.${uid}.slot`]: choice.slot 
+            }, true);
         };
         window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, true); };
         window.updateNValue = async (i, v) => { if (!isAdmin()) return; let n = [...roomData.nValues]; n[i] = parseInt(v) || 0; updateRoom({ nValues: n }, true); };
@@ -556,8 +544,9 @@
         // Step 1: Unified function — computes pool locally, ONE write to start banning
         window.startDraftAction = async () => {
             if (!isAdmin()) return;
-            const r = roomData.players.filter(x => x.team === 'Radiant').length;
-            const d = roomData.players.filter(x => x.team === 'Dire').length;
+            const playersArr = Object.values(roomData.players || {});
+            const r = playersArr.filter(x => x.team === 'Radiant').length;
+            const d = playersArr.filter(x => x.team === 'Dire').length;
             const seq = getStrategies(r, d)[roomData.strategyIdx].seq;
             let pl = []; let used = new Set();
             roomData.nValues.forEach((n, i) => {
@@ -575,9 +564,13 @@
 
         window.startOverAction = async () => {
             if (!isAdmin()) return;
-            const resetPlayers = roomData.players.map(p => ({ ...p, team: 'unassigned', slot: -1 }));
+            const playersObj = { ...roomData.players };
+            Object.keys(playersObj).forEach(uid => {
+                playersObj[uid].team = 'unassigned';
+                playersObj[uid].slot = -1;
+            });
             localSetupPositions = {}; localExcludedIds = new Set();
-            await updateRoom({ stage: 'lobby', players: resetPlayers, pool: [], bans: [], picksRadiant: [], picksDire: [], randomPickIds: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
+            await updateRoom({ stage: 'lobby', players: playersObj, pool: [], bans: [], picksRadiant: [], picksDire: [], randomPickIds: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
         };
 
         window.cancelSetupAction = async () => {
@@ -604,8 +597,9 @@
 
         window.startDraftSetup = async () => {
             if (!isAdmin()) return;
-            const rCount = roomData.players.filter(p => p.team === 'Radiant').length;
-            const dCount = roomData.players.filter(p => p.team === 'Dire').length;
+            const playersArr = Object.values(roomData.players || {});
+            const rCount = playersArr.filter(p => p.team === 'Radiant').length;
+            const dCount = playersArr.filter(p => p.team === 'Dire').length;
             if (rCount === 0 || dCount === 0) {
                 alert("Both teams must have at least one player or bot to start.");
                 return;
@@ -645,8 +639,9 @@
 
         window.handleHeroClick = async (heroId) => {
             if (roomData.stage === 'formation') return;
+            const playersArr = Object.values(roomData.players || {});
             if (roomData.stage === 'banning') {
-                const myT = roomData.players.find(p => p.uid === localUser.uid)?.team;
+                const myT = playersArr.find(p => p.uid === localUser.uid)?.team;
                 if (myT !== roomData.currentTurnTeam) return;
                 await updateRoom({ [`votes.${localUser.uid}`]: heroId }); // safe debounced dot-notation update
             } else if (roomData.stage === 'picking') {
@@ -667,7 +662,7 @@
         };
 
         const renderLobby = (c) => {
-            const players = roomData.players || [];
+            const players = Object.values(roomData.players || {});
             const host = isAdmin();
             const hostUser = players.find(p => p.uid === roomData.hostUid);
             const hostName = hostUser ? hostUser.name : 'Host';
@@ -696,8 +691,9 @@
         };
 
         const renderSetup = (c) => {
-            const rPlayers = roomData.players.filter(p => p.team === 'Radiant').length;
-            const dPlayers = roomData.players.filter(p => p.team === 'Dire').length;
+            const playersArr = Object.values(roomData.players || {});
+            const rPlayers = playersArr.filter(p => p.team === 'Radiant').length;
+            const dPlayers = playersArr.filter(p => p.team === 'Dire').length;
             const totalPlayers = rPlayers + dPlayers;
             const totalBans = roomData.bansRadiant + roomData.bansDire;
             const totalPool = roomData.nValues.reduce((a, b) => a + b, 0);
@@ -803,8 +799,9 @@
         };
 
         const renderDraft = (c) => {
+            const playersArr = Object.values(roomData.players || {});
             const isB = roomData.stage === 'banning', isR = roomData.stage === 'result', isF = roomData.stage === 'formation';
-            const turnP = getCurrentPickPlayer(), myT = roomData.players.find(p => p.uid === localUser.uid)?.team;
+            const turnP = getCurrentPickPlayer(), myT = playersArr.find(p => p.uid === localUser.uid)?.team;
             const isMyTurn = turnP && turnP.uid === localUser.uid;
             const isMyAction = !isF && ((isB && roomData.currentTurnTeam === myT) || (roomData.stage === 'picking' && isMyTurn));
             
@@ -818,7 +815,7 @@
             const sortedPool = [...hydPool].sort((a, b) => a.name.localeCompare(b.name));
 
             const renderHeroResultEntry = (teamName, size) => {
-                const teamPlayers = roomData.players.filter(p => p.team === teamName).sort((a, b) => a.slot - b.slot);
+                const teamPlayers = Object.values(roomData.players || {}).filter(p => p.team === teamName).sort((a, b) => a.slot - b.slot);
                 const pickIds = teamName === 'Radiant' ? roomData.picksRadiant : roomData.picksDire;
                 return Array(size).fill(0).map((_, i) => {
                     const h = getHeroById(pickIds?.[i]), p = teamPlayers[i];
@@ -839,7 +836,7 @@
             };
 
             const renderSlots = (tN, pickIds, size) => {
-                const tP = roomData.players.filter(p => p.team === tN).sort((a, b) => a.slot - b.slot);
+                const tP = Object.values(roomData.players || {}).filter(p => p.team === tN).sort((a, b) => a.slot - b.slot);
                 return Array(size).fill(0).map((_, i) => {
                     const h = getHeroById(pickIds?.[i]), p = tP[i];
                     const activePlayerSlot = (roomData.stage === 'picking' && turnP && p && p.uid === turnP.uid);
@@ -930,7 +927,7 @@
                                 <p class="text-[8px] font-bold text-slate-600 uppercase tracking-[0.2em] leading-none">Who are we waiting for?</p>
                             </div>
                             <div class="flex items-center gap-3">
-                                ${myT === roomData.currentTurnTeam ? roomData.players.filter(p => p.team === roomData.currentTurnTeam).sort((a, b) => a.slot - b.slot).map(p => {
+                                ${myT === roomData.currentTurnTeam ? playersArr.filter(p => p.team === roomData.currentTurnTeam).sort((a, b) => a.slot - b.slot).map(p => {
                     const v = roomData.votes[p.uid];
                     return `<div class="flex items-center gap-2 bg-black/40 pr-3 pl-1 py-1 rounded-xl border border-white/5 transition-all ${v ? 'opacity-100' : 'opacity-40'}">
                                         <div class="relative">
@@ -940,7 +937,7 @@
                                         <span class="text-[9px] font-black uppercase ${v ? 'text-white' : 'text-slate-500'}">${p.name}</span>
                                     </div>`;
                 }).join('') : (() => {
-                    const tP = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
+                    const tP = playersArr.filter(p => p.team === roomData.currentTurnTeam);
                     const vC = tP.filter(p => roomData.votes[p.uid]).length;
                     return `<div class="bg-black/40 px-6 py-3 rounded-xl border border-white/5 flex items-center gap-3"><div class="w-3 h-3 rounded-full ${vC === tP.length && tP.length > 0 ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}"></div><span class="text-[10px] font-black uppercase tracking-widest ${vC === tP.length && tP.length > 0 ? 'text-green-500' : 'text-amber-500'}">${vC} / ${tP.length} VOTES SUBMITTED</span></div>`;
                 })()}
@@ -949,11 +946,11 @@
                         <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-x-6 gap-y-10">${sortedPool.map((h, idx) => {
                     const isBan = roomData.bans.find(x => x.i === h.id);
                     const isPick = roomData.picksRadiant?.includes(h.id) || roomData.picksDire?.includes(h.id);
-                    const activeTeamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
+                    const activeTeamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
                     const canSeeVotes = myT === roomData.currentTurnTeam;
                     const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
                     const bSize = 8 + (vCount * 4);
-                    const myV = roomData.votes[localUser.uid] === h.id, teamV = canSeeVotes ? roomData.players.filter(p => p.team === roomData.currentTurnTeam && roomData.votes[p.uid] === h.id) : [];
+                    const myV = roomData.votes[localUser.uid] === h.id, teamV = canSeeVotes ? playersArr.filter(p => p.team === roomData.currentTurnTeam && roomData.votes[p.uid] === h.id) : [];
                     const pend = roomData.pendingHeroId === h.id;
                     const anim = isF, del = sortedPool.length > 0 ? (7 / sortedPool.length) : 0;
                     return `<div ${!isF ? `onclick="handleHeroClick(${h.id})"` : ''} class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 ${!isF ? 'cursor-pointer' : ''}" style="${anim ? `animation-delay: ${idx * del}s; animation-fill-mode: both;` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && vCount > 0 ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan ? 'hero-banned-fx' : isPick ? 'hero-picked-fx' : ''}">
@@ -978,12 +975,10 @@
             }
         };
 
-        // Step 3: Timestamp-based timer — ZERO writes for time management
-        // timerStart is the epoch ms when the turn started.
-        // rawLeft = duration - elapsed. Visual acceleration when allVotedSame (no writes).
-        const timerLogic = () => {
+          const timerLogic = () => {
             if (!roomData.timerStart || roomData.stage === 'result' || roomData.stage === 'entry' || roomData.stage === 'lobby' || roomData.stage === 'setup') return;
             const now = Date.now();
+            const playersArr = Object.values(roomData.players || {});
             
             if (roomData.stage === 'formation') {
                 if (isAdmin() && now - roomData.timerStart >= 7000) {
@@ -996,8 +991,8 @@
             const extraDur = 10000;
             const currentTurnMax = roomData.isExtraTime ? extraDur : baseDur;
             const elapsed = now - roomData.timerStart;
-
-            const teamMembers = roomData.players.filter(p => p.team === roomData.currentTurnTeam);
+ 
+            const teamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
             const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
             const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
             const allInTeamVoted = roomData.stage === 'banning' && teamMembers.length > 0 && teamMembers.every(p => roomData.votes[p.uid]);
@@ -1008,7 +1003,7 @@
                     const bots = teamMembers.filter(p => p.uid.startsWith('bot') && !roomData.votes[p.uid]);
                     if (bots.length > 0) botActionTimeout = setTimeout(async () => {
                         const botUid = bots[0].uid;
-                        const teamVotes = Object.entries(roomData.votes).filter(([uid]) => roomData.players.find(p => p.uid === uid)?.team === roomData.currentTurnTeam).map(([, hid]) => hid);
+                        const teamVotes = Object.entries(roomData.votes).filter(([uid]) => playersArr.find(p => p.uid === uid)?.team === roomData.currentTurnTeam).map(([, hid]) => hid);
                         let chosenId;
                         if (teamVotes.length > 0 && Math.random() < 0.4) {
                             chosenId = teamVotes[Math.floor(Math.random() * teamVotes.length)];
@@ -1083,8 +1078,10 @@
 
         const joinRoom = async (code) => {
             // Slim initD: no excludedHeroIds/customHeroPositions, timerStart instead of timerEnd
+            const playersMap = {}; 
+            playersMap[localUser.uid] = { ...localUser, team: 'unassigned', slot: -1 };
             const initD = {
-                id: code, stage: 'lobby', players: [{ ...localUser, team: 'unassigned', slot: -1 }], hostUid: localUser.uid,
+                id: code, stage: 'lobby', players: playersMap, hostUid: localUser.uid,
                 nValues: [5, 5, 5, 5, 5], pool: [], bans: [], picksRadiant: [], picksDire: [],
                 teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
                 strategyIdx: 0, timerStart: 0, isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant',
@@ -1095,44 +1092,27 @@
             if (isLocalMode) { roomData = initD; render(); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
             try {
-                const snap = await getDoc(ref); if (!snap.exists()) await setDoc(ref, initD);
-                else {
-                    await transactionalUpdateRoom(data => {
-                        const p = [...(data.players || [])];
-                        if (!p.find(x => x.uid === localUser.uid)) {
-                            p.push({ ...localUser, team: 'unassigned', slot: -1 });
-                            return { players: p };
-                        }
-                        return null;
-                    });
-                }
+                const snap = await getDoc(ref); 
+                if (!snap.exists()) await setDoc(ref, initD);
+                else await updateRoom({ [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } }, true);
+                
                 onSnapshot(ref, d => {
                     if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); }
                     else {
                         const data = d.data();
-                        // Re-apply any pending local updates that haven't been confirmed by the server yet
-                        // This prevents UI 'jumping' back to old state during network latency
+                        // 1. First, merge any existing server data with roomData to not lose keys
+                        // 2. Then re-apply any pending local updates
                         for (let k in _pendingUpdate) {
-                            if (k === 'players' && Array.isArray(_pendingUpdate[k])) {
-                                // Special case: Merge players by UID instead of replacing the entire array
-                                // This prevents teammates from 'disappearing' during an optimistic join
-                                const pendingPlayers = _pendingUpdate[k];
-                                data.players = data.players || [];
-                                pendingPlayers.forEach(pp => {
-                                    const existingIdx = data.players.findIndex(p => p.uid === pp.uid);
-                                    if (existingIdx > -1) {
-                                        data.players[existingIdx] = { ...data.players[existingIdx], ...pp };
-                                    } else {
-                                        data.players.push(pp);
-                                    }
-                                });
-                            } else if (k.includes('.')) {
+                            if (k.includes('.')) {
                                 const pts = k.split('.'); let o = data;
                                 for (let i = 0; i < pts.length - 1; i++) {
                                     if (!o[pts[i]]) o[pts[i]] = {};
                                     o = o[pts[i]];
                                 }
                                 o[pts[pts.length - 1]] = _pendingUpdate[k];
+                            } else if (k === 'players') {
+                                // For full object replacement (like in shuffleAction)
+                                data.players = { ...(data.players || {}), ..._pendingUpdate[k] };
                             } else {
                                 data[k] = _pendingUpdate[k];
                             }
