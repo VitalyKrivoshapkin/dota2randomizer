@@ -362,31 +362,40 @@
                 render(); return; 
             }
             
-            _pendingUpdate = { ..._pendingUpdate, ...u };
-            // Optimistic local update
+            // 1. Accumulate all updates into _pendingUpdate
+            for(let k in u) _pendingUpdate[k] = u[k];
+
+            // 2. Optimistic local update
             for (let k in u) {
                 if (k.includes('.')) {
                     const pts = k.split('.'); let o = roomData;
-                    for (let i = 0; i < pts.length-1; i++) o = o[pts[i]];
+                    for (let i = 0; i < pts.length-1; i++) { if(!o[pts[i]]) o[pts[i]] = {}; o = o[pts[i]]; }
                     o[pts[pts.length-1]] = u[k];
                 } else roomData[k] = u[k];
             }
+            render(); 
 
             if (immediate) {
                 if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
                 const toSend = { ..._pendingUpdate };
-                _pendingUpdate = {};
-                render();
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
+                } finally {
+                    // Clear only confirmed keys
+                    for(let k in toSend) { if(_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
+                }
             } else {
-                render();
                 if (_debounceTimer) clearTimeout(_debounceTimer);
                 _debounceTimer = setTimeout(async () => {
                     _debounceTimer = null;
                     const toSend = { ..._pendingUpdate };
-                    _pendingUpdate = {};
-                    if (Object.keys(toSend).length > 0)
-                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
+                    if (Object.keys(toSend).length > 0) {
+                        try {
+                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
+                        } finally {
+                            for(let k in toSend) { if(_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
+                        }
+                    }
                 }, 500);
             }
         };
@@ -394,6 +403,12 @@
         const transactionalUpdateRoom = async (updateFn) => {
             if (isLocalMode) { const u = updateFn(roomData); if (u) updateRoom(u, true); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id);
+            // Optimistic pre-apply
+            const optimistic = updateFn(roomData);
+            if (optimistic) {
+                for(let k in optimistic) _pendingUpdate[k] = optimistic[k];
+                updateRoom(optimistic, false); 
+            }
             try {
                 await runTransaction(db, async (transaction) => {
                     const snap = await transaction.get(ref);
@@ -404,6 +419,10 @@
             } catch (e) {
                 console.error("Transact fail:", e);
                 alert("Ошибка синхронизации: попробуйте еще раз.");
+            } finally {
+                if (optimistic) {
+                    for(let k in optimistic) { if(_pendingUpdate[k] === optimistic[k]) delete _pendingUpdate[k]; }
+                }
             }
         };
 
@@ -1095,7 +1114,22 @@
                 onSnapshot(ref, d => {
                     if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); }
                     else {
-                        roomData = d.data();
+                        const data = d.data();
+                        // Re-apply any pending local updates that haven't been confirmed by the server yet
+                        // This prevents UI 'jumping' back to old state during network latency
+                        for (let k in _pendingUpdate) {
+                            if (k.includes('.')) {
+                                const pts = k.split('.'); let o = data;
+                                for (let i = 0; i < pts.length - 1; i++) {
+                                    if (!o[pts[i]]) o[pts[i]] = {};
+                                    o = o[pts[i]];
+                                }
+                                o[pts[pts.length - 1]] = _pendingUpdate[k];
+                            } else {
+                                data[k] = _pendingUpdate[k];
+                            }
+                        }
+                        roomData = data;
                         render();
                     }
                 });
