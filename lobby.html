@@ -248,7 +248,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const manualConfig = {
@@ -347,13 +347,31 @@
         // Step 2: Debounced updateRoom
         // immediate=true  → cancel debounce, write now (stage transitions, confirms)
         // immediate=false → apply locally for instant UI, batch writes with 500ms debounce (votes, picks)
+        // Step 2: Debounced updateRoom
+        // immediate=true  → cancel debounce, write now (stage transitions, confirms)
+        // immediate=false → apply locally for instant UI, batch writes with 500ms debounce (votes, picks)
         const updateRoom = async (u, immediate = false) => {
-            const manager = document.getElementById('hero-tag-manager');
-            if (manager) tagManagerScrollTop = manager.scrollTop;
-            if (isLocalMode) { roomData = { ...roomData, ...u }; render(); return; }
-            // Accumulate partial updates and apply optimistically
+            if (isLocalMode) { 
+                for (let k in u) {
+                    if (k.includes('.')) {
+                        const pts = k.split('.'); let o = roomData;
+                        for (let i = 0; i < pts.length - 1; i++) o = o[pts[i]];
+                        o[pts[pts.length - 1]] = u[k];
+                    } else roomData[k] = u[k];
+                }
+                render(); return; 
+            }
+            
             _pendingUpdate = { ..._pendingUpdate, ...u };
-            roomData = { ...roomData, ...u };
+            // Optimistic local update
+            for (let k in u) {
+                if (k.includes('.')) {
+                    const pts = k.split('.'); let o = roomData;
+                    for (let i = 0; i < pts.length-1; i++) o = o[pts[i]];
+                    o[pts[pts.length-1]] = u[k];
+                } else roomData[k] = u[k];
+            }
+
             if (immediate) {
                 if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
                 const toSend = { ..._pendingUpdate };
@@ -361,7 +379,7 @@
                 render();
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
             } else {
-                render(); // instant local feedback
+                render();
                 if (_debounceTimer) clearTimeout(_debounceTimer);
                 _debounceTimer = setTimeout(async () => {
                     _debounceTimer = null;
@@ -370,6 +388,22 @@
                     if (Object.keys(toSend).length > 0)
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
                 }, 500);
+            }
+        };
+
+        const transactionalUpdateRoom = async (updateFn) => {
+            if (isLocalMode) { const u = updateFn(roomData); if (u) updateRoom(u, true); return; }
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id);
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const snap = await transaction.get(ref);
+                    if (!snap.exists()) return;
+                    const updates = updateFn(snap.data());
+                    if (updates) transaction.update(ref, updates);
+                });
+            } catch (e) {
+                console.error("Transact fail:", e);
+                alert("Ошибка синхронизации: попробуйте еще раз.");
             }
         };
 
@@ -432,11 +466,75 @@
         window.loginOfflineAction = () => { isLocalMode = true; localUser = { uid: "local_" + Math.random().toString(36).substr(2, 4), name: "Player", photo: `https://api.dicebear.com/7.x/avataaars/svg?seed=offline` }; joinRoom("OFFLINE_1"); };
         window.logoutAction = async () => { if (!isLocalMode) await signOut(auth); window.location.reload(); };
         window.joinRoomAction = () => joinRoom(document.getElementById('room-code-input')?.value.trim().toUpperCase() || "BATTLE");
-        window.addBotAction = async () => { if (!isAdmin()) return; const botId = 'bot_' + Math.random().toString(36).substr(2, 9); updateRoom({ players: [...roomData.players, { uid: botId, name: "Bot " + Math.floor(Math.random() * 99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 }] }, true); };
-        window.joinTeamAction = async (team, slot) => { const players = [...roomData.players]; const idx = players.findIndex(p => p.uid === localUser.uid); if (idx === -1 || (team !== 'unassigned' && players.find(p => p.team === team && p.slot === slot))) return; players[idx].team = team; players[idx].slot = slot; updateRoom({ players }, true); };
-        window.kickPlayerAction = async (uid) => { if (!isAdmin()) return; const players = [...roomData.players]; const idx = players.findIndex(p => p.uid === uid); if (idx > -1) { players[idx].team = 'unassigned'; players[idx].slot = -1; updateRoom({ players }, true); } };
-        window.shuffleAction = async () => { if (!isAdmin()) return; let players = [...roomData.players]; let teamPlayers = players.filter(p => p.team === 'Radiant' || p.team === 'Dire'); let unassigned = players.filter(p => p.team === 'unassigned'); teamPlayers.sort(() => Math.random() - 0.5); let cR = 0, cD = 0; const tR = Math.random() > 0.5 ? Math.ceil(teamPlayers.length / 2) : Math.floor(teamPlayers.length / 2); teamPlayers.forEach(p => { if (cR < tR && cR < 5) { p.team = 'Radiant'; p.slot = cR++; } else if (cD < 5) { p.team = 'Dire'; p.slot = cD++; } else { p.team = 'unassigned'; p.slot = -1; } }); updateRoom({ players: [...teamPlayers, ...unassigned] }, true); };
-        window.assignBotAction = async (uid) => { if (!isAdmin()) return; const players = [...roomData.players]; const botIdx = players.findIndex(p => p.uid === uid); if (botIdx === -1) return; const occR = players.filter(p => p.team === 'Radiant'); const occD = players.filter(p => p.team === 'Dire'); let poss = []; for(let i=0; i<5; i++) { if(!occR.find(p => p.slot === i)) poss.push({team: 'Radiant', slot: i}); } for(let i=0; i<5; i++) { if(!occD.find(p => p.slot === i)) poss.push({team: 'Dire', slot: i}); } if (poss.length === 0) { alert("Нет свободных слотов!"); return; } const choice = poss[Math.floor(Math.random() * poss.length)]; players[botIdx].team = choice.team; players[botIdx].slot = choice.slot; updateRoom({ players }, true); };
+        window.addBotAction = async () => { 
+            if (!isAdmin()) return; 
+            const botId = 'bot_' + Math.random().toString(36).substr(2, 9); 
+            transactionalUpdateRoom(data => {
+                const p = [...(data.players || [])];
+                p.push({ uid: botId, name: "Bot " + Math.floor(Math.random() * 99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 });
+                return { players: p };
+            });
+        };
+        window.joinTeamAction = async (team, slot) => {
+            transactionalUpdateRoom(data => {
+                const pList = [...(data.players || [])];
+                const meIdx = pList.findIndex(p => p.uid === localUser.uid);
+                if (meIdx === -1) return null;
+                if (team !== 'unassigned' && pList.find(p => p.team === team && p.slot === slot)) return null;
+                pList[meIdx].team = team;
+                pList[meIdx].slot = slot;
+                return { players: pList };
+            });
+        };
+        window.kickPlayerAction = async (uid) => { 
+            if (!isAdmin()) return; 
+            transactionalUpdateRoom(data => {
+                const p = [...(data.players || [])];
+                const idx = p.findIndex(x => x.uid === uid);
+                if (idx > -1) {
+                    p[idx].team = 'unassigned';
+                    p[idx].slot = -1;
+                    return { players: p };
+                }
+                return null;
+            });
+        };
+        window.shuffleAction = async () => { 
+            if (!isAdmin()) return; 
+            transactionalUpdateRoom(data => {
+                let pList = [...(data.players || [])];
+                let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
+                let unassigned = pList.filter(p => p.team === 'unassigned');
+                teamPlayers.sort(() => Math.random() - 0.5);
+                let cR = 0, cD = 0;
+                const totalActive = teamPlayers.length;
+                const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
+                teamPlayers.forEach(p => {
+                    if (cR < tR && cR < 5) { p.team = 'Radiant'; p.slot = cR++; }
+                    else if (cD < 5) { p.team = 'Dire'; p.slot = cD++; }
+                    else { p.team = 'unassigned'; p.slot = -1; }
+                });
+                return { players: [...teamPlayers, ...unassigned] };
+            });
+        };
+        window.assignBotAction = async (uid) => { 
+            if (!isAdmin()) return; 
+            transactionalUpdateRoom(data => {
+                const pList = [...(data.players || [])];
+                const botIdx = pList.findIndex(p => p.uid === uid);
+                if (botIdx === -1) return null;
+                const occR = pList.filter(p => p.team === 'Radiant');
+                const occD = pList.filter(p => p.team === 'Dire');
+                let poss = [];
+                for(let i=0; i<5; i++) { if(!occR.find(p => p.slot === i)) poss.push({team: 'Radiant', slot: i}); }
+                for(let i=0; i<5; i++) { if(!occD.find(p => p.slot === i)) poss.push({team: 'Dire', slot: i}); }
+                if (poss.length === 0) return null;
+                const choice = poss[Math.floor(Math.random() * poss.length)];
+                pList[botIdx].team = choice.team;
+                pList[botIdx].slot = choice.slot;
+                return { players: pList };
+            });
+        };
         window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, true); };
         window.updateNValue = async (i, v) => { if (!isAdmin()) return; let n = [...roomData.nValues]; n[i] = parseInt(v) || 0; updateRoom({ nValues: n }, true); };
         // Step 1: Local-only — zero Firestore writes during setup
@@ -537,7 +635,7 @@
             if (roomData.stage === 'banning') {
                 const myT = roomData.players.find(p => p.uid === localUser.uid)?.team;
                 if (myT !== roomData.currentTurnTeam) return;
-                await updateRoom({ votes: { ...roomData.votes, [localUser.uid]: heroId } }); // debounced
+                await updateRoom({ [`votes.${localUser.uid}`]: heroId }); // safe debounced dot-notation update
             } else if (roomData.stage === 'picking') {
                 const turnP = getCurrentPickPlayer();
                 if (turnP?.uid === localUser.uid && !roomData.bans.find(b => b.i === heroId) && !roomData.picksRadiant?.includes(heroId) && !roomData.picksDire?.includes(heroId)) {
@@ -906,7 +1004,7 @@
                             const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !teamVotes.includes(id));
                             chosenId = (avail.length > 0 ? avail : roomData.pool)[Math.floor(Math.random() * Math.min(avail.length || 1, 5))];
                         }
-                        await updateRoom({ votes: { ...roomData.votes, [botUid]: chosenId } });
+                        await updateRoom({ [`votes.${botUid}`]: chosenId });
                         botActionTimeout = null;
                     }, 2000 + Math.random() * 2000);
                 } else if (roomData.stage === 'picking') {
@@ -985,11 +1083,14 @@
             try {
                 const snap = await getDoc(ref); if (!snap.exists()) await setDoc(ref, initD);
                 else {
-                    let p = snap.data().players || [];
-                    if (!p.find(x => x.uid === localUser.uid)) {
-                        p.push({ ...localUser, team: 'unassigned', slot: -1 });
-                        await updateDoc(ref, { players: p });
-                    }
+                    await transactionalUpdateRoom(data => {
+                        const p = [...(data.players || [])];
+                        if (!p.find(x => x.uid === localUser.uid)) {
+                            p.push({ ...localUser, team: 'unassigned', slot: -1 });
+                            return { players: p };
+                        }
+                        return null;
+                    });
                 }
                 onSnapshot(ref, d => {
                     if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); }
