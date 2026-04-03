@@ -1119,7 +1119,20 @@
                         // Re-apply any pending local updates that haven't been confirmed by the server yet
                         // This prevents UI 'jumping' back to old state during network latency
                         for (let k in _pendingUpdate) {
-                            if (k.includes('.')) {
+                            if (k === 'players' && Array.isArray(_pendingUpdate[k])) {
+                                // Special case: Merge players by UID instead of replacing the entire array
+                                // This prevents teammates from 'disappearing' during an optimistic join
+                                const pendingPlayers = _pendingUpdate[k];
+                                data.players = data.players || [];
+                                pendingPlayers.forEach(pp => {
+                                    const existingIdx = data.players.findIndex(p => p.uid === pp.uid);
+                                    if (existingIdx > -1) {
+                                        data.players[existingIdx] = { ...data.players[existingIdx], ...pp };
+                                    } else {
+                                        data.players.push(pp);
+                                    }
+                                });
+                            } else if (k.includes('.')) {
                                 const pts = k.split('.'); let o = data;
                                 for (let i = 0; i < pts.length - 1; i++) {
                                     if (!o[pts[i]]) o[pts[i]] = {};
