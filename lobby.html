@@ -275,11 +275,11 @@
         // timerStart replaces timerEnd; excludedHeroIds/customHeroPositions removed from DB
         let roomData = {
             id: '', stage: 'entry', players: {}, hostUid: '',
-            nValues: [5, 5, 5, 5, 5], pool: [], bans: [], picksRadiant: [], picksDire: [], draftSequence: [],
+            nValues: [5, 5, 5, 5, 5], pool: [], bans: {}, picksRadiant: {}, picksDire: {}, draftSequence: [],
             bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {},
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5,
             pendingHeroId: null, pickDuration: 20, infinitePickTime: false,
-            banDuration: 20, infiniteBanTime: false, randomPickIds: []
+            banDuration: 20, infiniteBanTime: false, randomPickIds: {}
         };
         let isLocalMode = false;
         let poolAnimationPlayed = true;
@@ -300,8 +300,140 @@
 
         const POS_LABELS = ["Pos 1 (Carry)", "Pos 2 (Mid)", "Pos 3 (Offlane)", "Pos 4 (Soft Supp)", "Pos 5 (Hard Supp)"];
 
+        //const HEROES = [
+        //   { id: 1, name: "Abaddon", imgName: "abaddon", positions: [3, 5] }, { id: 2, name: "Alchemist", imgName: "alchemist", positions: [1, 2] }, { id: 3, name: "Ancient Apparition", imgName: "ancient_apparition", positions: [4, 5] }, { id: 4, name: "Anti-Mage", imgName: "antimage", positions: [1, 2] }, { id: 5, name: "Arc Warden", imgName: "arc_warden", positions: [1, 2] }, { id: 6, name: "Axe", imgName: "axe", positions: [3, 4] }, { id: 7, name: "Bane", imgName: "bane", positions: [4, 5] }, { id: 8, name: "Batrider", imgName: "batrider", positions: [2, 3] }, { id: 9, name: "Beastmaster", imgName: "beastmaster", positions: [3, 4] }, { id: 10, name: "Bloodseeker", imgName: "bloodseeker", positions: [1, 2] }, { id: 11, name: "Bounty Hunter", imgName: "bounty_hunter", positions: [3, 4] }, { id: 12, name: "Brewmaster", imgName: "brewmaster", positions: [2, 3] }, { id: 13, name: "Bristleback", imgName: "bristleback", positions: [1, 3] }, { id: 14, name: "Broodmother", imgName: "broodmother", positions: [2, 3] }, { id: 15, name: "Centaur", imgName: "centaur", positions: [3, 4] }, { id: 16, name: "Chaos Knight", imgName: "chaos_knight", positions: [1, 3] }, { id: 17, name: "Chen", imgName: "chen", positions: [4, 5] }, { id: 18, name: "Clinkz", imgName: "clinkz", positions: [1, 4] }, { id: 19, name: "Clockwerk", imgName: "rattletrap", positions: [4, 5] }, { id: 20, name: "Crystal Maiden", imgName: "crystal_maiden", positions: [4, 5] }, { id: 21, name: "Dark Seer", imgName: "dark_seer", positions: [3, 4] }, { id: 22, name: "Dark Willow", imgName: "dark_willow", positions: [4, 5] }, { id: 23, name: "Dawnbreaker", imgName: "dawnbreaker", positions: [3, 4] }, { id: 24, name: "Dazzle", imgName: "dazzle", positions: [2, 5] }, { id: 25, name: "Death Prophet", imgName: "death_prophet", positions: [2, 3] }, { id: 26, name: "Disruptor", imgName: "disruptor", positions: [4, 5] }, { id: 27, name: "Doom", imgName: "doom_bringer", positions: [3, 4] }, { id: 28, name: "Dragon Knight", imgName: "dragon_knight", positions: [2, 3] }, { id: 29, name: "Drow Ranger", imgName: "drow_ranger", positions: [1, 2] }, { id: 30, name: "Earth Spirit", imgName: "earth_spirit", positions: [2, 4] }, { id: 31, name: "Earthshaker", imgName: "earthshaker", positions: [3, 4] }, { id: 32, name: "Elder Titan", imgName: "elder_titan", positions: [4, 5] }, { id: 33, name: "Ember Spirit", imgName: "ember_spirit", positions: [1, 2] }, { id: 34, name: "Enchantress", imgName: "enchantress", positions: [4, 5] }, { id: 35, name: "Enigma", imgName: "enigma", positions: [3, 4] }, { id: 36, name: "Faceless Void", imgName: "faceless_void", positions: [1, 3] }, { id: 37, name: "Grimstroke", imgName: "grimstroke", positions: [4, 5] }, { id: 38, name: "Gyrocopter", imgName: "gyrocopter", positions: [1, 4] }, { id: 39, name: "Hoodwink", imgName: "hoodwink", positions: [2, 4] }, { id: 40, name: "Huskar", imgName: "huskar", positions: [1, 2] }, { id: 41, name: "Invoker", imgName: "invoker", positions: [2, 4] }, { id: 42, name: "Io", imgName: "wisp", positions: [4, 5] }, { id: 43, name: "Jakiro", imgName: "jakiro", positions: [4, 5] }, { id: 44, name: "Juggernaut", imgName: "juggernaut", positions: [1, 2] }, { id: 45, name: "KOTL", imgName: "keeper_of_the_light", positions: [4, 5] }, { id: 46, name: "Kunkka", imgName: "kunkka", positions: [2, 3] }, { id: 47, name: "Legion", imgName: "legion_commander", positions: [1, 3] }, { id: 48, name: "Leshrac", imgName: "leshrac", positions: [2, 4] }, { id: 49, name: "Lich", imgName: "lich", positions: [4, 5] }, { id: 50, name: "Lifestealer", imgName: "life_stealer", positions: [1, 3] }, { id: 51, name: "Lina", imgName: "lina", positions: [2, 4] }, { id: 52, name: "Lion", imgName: "lion", positions: [4, 5] }, { id: 53, name: "Lone Druid", imgName: "lone_druid", positions: [1, 3] }, { id: 54, name: "Luna", imgName: "luna", positions: [1, 4] }, { id: 55, name: "Lycan", imgName: "lycan", positions: [1, 3] }, { id: 56, name: "Magnus", imgName: "magnataur", positions: [2, 3] }, { id: 57, name: "Marci", imgName: "marci", positions: [3, 4] }, { id: 58, name: "Mars", imgName: "mars", positions: [2, 3] }, { id: 59, name: "Medusa", imgName: "medusa", positions: [1, 2] }, { id: 60, name: "Meepo", imgName: "meepo", positions: [1, 2] }, { id: 61, name: "Mirana", imgName: "mirana", positions: [2, 4] }, { id: 62, name: "Monkey King", imgName: "monkey_king", positions: [1, 2] }, { id: 63, name: "Morphling", imgName: "morphling", positions: [1, 2] }, { id: 64, name: "Muerta", imgName: "muerta", positions: [1, 2] }, { id: 65, name: "Naga Siren", imgName: "naga_siren", positions: [1, 4] }, { id: 66, name: "Nature", imgName: "furion", positions: [2, 3] }, { id: 67, name: "Necrophos", imgName: "necrolyte", positions: [2, 3] }, { id: 68, name: "Night Stalker", imgName: "night_stalker", positions: [2, 3] }, { id: 69, name: "Nyx", imgName: "nyx_assassin", positions: [2, 4] }, { id: 70, name: "Ogre Magi", imgName: "ogre_magi", positions: [3, 5] }, { id: 71, name: "Omniknight", imgName: "omniknight", positions: [3, 5] }, { id: 72, name: "Oracle", imgName: "oracle", positions: [4, 5] }, { id: 73, name: "OD", imgName: "obsidian_destroyer", positions: [1, 2] }, { id: 74, name: "Pangolier", imgName: "pangolier", positions: [2, 3] }, { id: 75, name: "PA", imgName: "phantom_assassin", positions: [1, 2] }, { id: 76, name: "PL", imgName: "phantom_lancer", positions: [1, 2] }, { id: 77, name: "Phoenix", imgName: "phoenix", positions: [3, 4] }, { id: 78, name: "Primal Beast", imgName: "primal_beast", positions: [2, 3] }, { id: 79, name: "Puck", imgName: "puck", positions: [2, 4] }, { id: 80, name: "Pudge", imgName: "pudge", positions: [3, 4] }, { id: 81, name: "Pugna", imgName: "pugna", positions: [2, 4] }, { id: 82, name: "QOP", imgName: "queenofpain", positions: [2, 4] }, { id: 83, name: "Razor", imgName: "razor", positions: [1, 3] }, { id: 84, name: "Riki", imgName: "riki", positions: [1, 4] }, { id: 85, name: "Rubick", imgName: "rubick", positions: [2, 4] }, { id: 86, name: "Sand King", imgName: "sand_king", positions: [3, 4] }, { id: 87, name: "Shadow Demon", imgName: "shadow_demon", positions: [4, 5] }, { id: 88, name: "SF", imgName: "nevermore", positions: [1, 2] }, { id: 89, name: "Shadow Shaman", imgName: "shadow_shaman", positions: [4, 5] }, { id: 90, name: "Silencer", imgName: "silencer", positions: [2, 5] }, { id: 91, name: "Skywrath", imgName: "skywrath_mage", positions: [2, 4] }, { id: 92, name: "Slardar", imgName: "slardar", positions: [1, 3] }, { id: 93, name: "Slark", imgName: "slark", positions: [1, 2] }, { id: 94, name: "Snapfire", imgName: "snapfire", positions: [2, 4] }, { id: 95, name: "Sniper", imgName: "sniper", positions: [1, 2] }, { id: 96, name: "Spectre", imgName: "spectre", positions: [1, 3] }, { id: 97, name: "Spirit Breaker", imgName: "spirit_breaker", positions: [3, 4] }, { id: 98, name: "Storm Spirit", imgName: "storm_spirit", positions: [2, 4] }, { id: 99, name: "Sven", imgName: "sven", positions: [1, 3] }, { id: 100, name: "Techies", imgName: "techies", positions: [2, 4] }
+        //];
+
         const HEROES = [
-            { id: 1, name: "Abaddon", imgName: "abaddon", positions: [3, 5] }, { id: 2, name: "Alchemist", imgName: "alchemist", positions: [1, 2] }, { id: 3, name: "Ancient Apparition", imgName: "ancient_apparition", positions: [4, 5] }, { id: 4, name: "Anti-Mage", imgName: "antimage", positions: [1] }, { id: 5, name: "Arc Warden", imgName: "arc_warden", positions: [1, 2] }, { id: 6, name: "Axe", imgName: "axe", positions: [3] }, { id: 7, name: "Bane", imgName: "bane", positions: [5] }, { id: 8, name: "Batrider", imgName: "batrider", positions: [2, 3] }, { id: 9, name: "Beastmaster", imgName: "beastmaster", positions: [3] }, { id: 10, name: "Bloodseeker", imgName: "bloodseeker", positions: [1, 2] }, { id: 11, name: "Bounty Hunter", imgName: "bounty_hunter", positions: [4] }, { id: 12, name: "Brewmaster", imgName: "brewmaster", positions: [3] }, { id: 13, name: "Bristleback", imgName: "bristleback", positions: [1, 3] }, { id: 14, name: "Broodmother", imgName: "broodmother", positions: [2, 3] }, { id: 15, name: "Centaur", imgName: "centaur", positions: [3] }, { id: 16, name: "Chaos Knight", imgName: "chaos_knight", positions: [1] }, { id: 17, name: "Chen", imgName: "chen", positions: [5] }, { id: 18, name: "Clinkz", imgName: "clinkz", positions: [1, 4] }, { id: 19, name: "Clockwerk", imgName: "rattletrap", positions: [4, 5] }, { id: 20, name: "Crystal Maiden", imgName: "crystal_maiden", positions: [5] }, { id: 21, name: "Dark Seer", imgName: "dark_seer", positions: [3] }, { id: 22, name: "Dark Willow", imgName: "dark_willow", positions: [4, 5] }, { id: 23, name: "Dawnbreaker", imgName: "dawnbreaker", positions: [3, 4] }, { id: 24, name: "Dazzle", imgName: "dazzle", positions: [2, 5] }, { id: 25, name: "Death Prophet", imgName: "death_prophet", positions: [2, 3] }, { id: 26, name: "Disruptor", imgName: "disruptor", positions: [5] }, { id: 27, name: "Doom", imgName: "doom_bringer", positions: [3, 4] }, { id: 28, name: "Dragon Knight", imgName: "dragon_knight", positions: [2, 3] }, { id: 29, name: "Drow Ranger", imgName: "drow_ranger", positions: [1] }, { id: 30, name: "Earth Spirit", imgName: "earth_spirit", positions: [4] }, { id: 31, name: "Earthshaker", imgName: "earthshaker", positions: [4, 3] }, { id: 32, name: "Elder Titan", imgName: "elder_titan", positions: [4, 5] }, { id: 33, name: "Ember Spirit", imgName: "ember_spirit", positions: [2] }, { id: 34, name: "Enchantress", imgName: "enchantress", positions: [5, 4] }, { id: 35, name: "Enigma", imgName: "enigma", positions: [3, 4] }, { id: 36, name: "Faceless Void", imgName: "faceless_void", positions: [1] }, { id: 37, name: "Grimstroke", imgName: "grimstroke", positions: [4, 5] }, { id: 38, name: "Gyrocopter", imgName: "gyrocopter", positions: [1, 4] }, { id: 39, name: "Hoodwink", imgName: "hoodwink", positions: [4] }, { id: 40, name: "Huskar", imgName: "huskar", positions: [2] }, { id: 41, name: "Invoker", imgName: "invoker", positions: [2] }, { id: 42, name: "Io", imgName: "wisp", positions: [5, 4] }, { id: 43, name: "Jakiro", imgName: "jakiro", positions: [5, 4] }, { id: 44, name: "Juggernaut", imgName: "juggernaut", positions: [1] }, { id: 45, name: "KOTL", imgName: "keeper_of_the_light", positions: [4, 5] }, { id: 46, name: "Kunkka", imgName: "kunkka", positions: [2, 3] }, { id: 47, name: "Legion", imgName: "legion_commander", positions: [3] }, { id: 48, name: "Leshrac", imgName: "leshrac", positions: [2, 4] }, { id: 49, name: "Lich", imgName: "lich", positions: [5] }, { id: 50, name: "Lifestealer", imgName: "life_stealer", positions: [1] }, { id: 51, name: "Lina", imgName: "lina", positions: [2, 4] }, { id: 52, name: "Lion", imgName: "lion", positions: [5, 4] }, { id: 53, name: "Lone Druid", imgName: "lone_druid", positions: [1, 2, 3] }, { id: 54, name: "Luna", imgName: "luna", positions: [1] }, { id: 55, name: "Lycan", imgName: "lycan", positions: [3] }, { id: 56, name: "Magnus", imgName: "magnataur", positions: [3, 2] }, { id: 57, name: "Marci", imgName: "marci", positions: [4, 3] }, { id: 58, name: "Mars", imgName: "mars", positions: [3] }, { id: 59, name: "Medusa", imgName: "medusa", positions: [1] }, { id: 60, name: "Meepo", imgName: "meepo", positions: [1, 2] }, { id: 61, name: "Mirana", imgName: "mirana", positions: [4] }, { id: 62, name: "Monkey King", imgName: "monkey_king", positions: [1, 2] }, { id: 63, name: "Morphling", imgName: "morphling", positions: [1] }, { id: 64, name: "Muerta", imgName: "muerta", positions: [1, 2] }, { id: 65, name: "Naga Siren", imgName: "naga_siren", positions: [1, 4] }, { id: 66, name: "Nature", imgName: "furion", positions: [3, 2, 4, 5] }, { id: 67, name: "Necrophos", imgName: "necrolyte", positions: [2, 3] }, { id: 68, name: "Night Stalker", imgName: "night_stalker", positions: [3] }, { id: 69, name: "Nyx", imgName: "nyx_assassin", positions: [4] }, { id: 70, name: "Ogre Magi", imgName: "ogre_magi", positions: [5] }, { id: 71, name: "Omniknight", imgName: "omniknight", positions: [5, 3] }, { id: 72, name: "Oracle", imgName: "oracle", positions: [5] }, { id: 73, name: "OD", imgName: "obsidian_destroyer", positions: [2] }, { id: 74, name: "Pangolier", imgName: "pangolier", positions: [2, 3] }, { id: 75, name: "PA", imgName: "phantom_assassin", positions: [1] }, { id: 76, name: "PL", imgName: "phantom_lancer", positions: [1] }, { id: 77, name: "Phoenix", imgName: "phoenix", positions: [3, 4] }, { id: 78, name: "Primal Beast", imgName: "primal_beast", positions: [2, 3] }, { id: 79, name: "Puck", imgName: "puck", positions: [2] }, { id: 80, name: "Pudge", imgName: "pudge", positions: [1, 4, 5] }, { id: 81, name: "Pugna", imgName: "pugna", positions: [2, 4, 5] }, { id: 82, name: "QOP", imgName: "queenofpain", positions: [2] }, { id: 83, name: "Razor", imgName: "razor", positions: [1, 3] }, { id: 84, name: "Riki", imgName: "riki", positions: [1, 4] }, { id: 85, name: "Rubick", imgName: "rubick", positions: [4] }, { id: 86, name: "Sand King", imgName: "sand_king", positions: [3, 4] }, { id: 87, name: "Shadow Demon", imgName: "shadow_demon", positions: [5] }, { id: 88, name: "SF", imgName: "nevermore", positions: [2] }, { id: 89, name: "Shadow Shaman", imgName: "shadow_shaman", positions: [5] }, { id: 90, name: "Silencer", imgName: "silencer", positions: [5, 4] }, { id: 91, name: "Skywrath", imgName: "skywrath_mage", positions: [4, 5] }, { id: 92, name: "Slardar", imgName: "slardar", positions: [3] }, { id: 93, name: "Slark", imgName: "slark", positions: [1] }, { id: 94, name: "Snapfire", imgName: "snapfire", positions: [2, 4] }, { id: 95, name: "Sniper", imgName: "sniper", positions: [1, 2] }, { id: 96, name: "Spectre", imgName: "spectre", positions: [1] }, { id: 97, name: "Spirit Breaker", imgName: "spirit_breaker", positions: [3, 4] }, { id: 98, name: "Storm Spirit", imgName: "storm_spirit", positions: [2] }, { id: 99, name: "Sven", imgName: "sven", positions: [1, 3] }, { id: 100, name: "Techies", imgName: "techies", positions: [4] }
+            // --- ВАШ ИСХОДНЫЙ СПИСОК (1-100) ---
+            { id: 1, name: "Abaddon", imgName: "abaddon", positions: [3, 5] },
+            { id: 2, name: "Alchemist", imgName: "alchemist", positions: [1, 2] },
+            { id: 3, name: "Ancient Apparition", imgName: "ancient_apparition", positions: [4, 5] },
+            { id: 4, name: "Anti-Mage", imgName: "antimage", positions: [1, 2] },
+            { id: 5, name: "Arc Warden", imgName: "arc_warden", positions: [1, 2] },
+            { id: 6, name: "Axe", imgName: "axe", positions: [3, 4] },
+            { id: 7, name: "Bane", imgName: "bane", positions: [4, 5] },
+            { id: 8, name: "Batrider", imgName: "batrider", positions: [2, 3] },
+            { id: 9, name: "Beastmaster", imgName: "beastmaster", positions: [3, 4] },
+            { id: 10, name: "Bloodseeker", imgName: "bloodseeker", positions: [1, 2] },
+            { id: 11, name: "Bounty Hunter", imgName: "bounty_hunter", positions: [3, 4] },
+            { id: 12, name: "Brewmaster", imgName: "brewmaster", positions: [2, 3] },
+            { id: 13, name: "Bristleback", imgName: "bristleback", positions: [1, 3] },
+            { id: 14, name: "Broodmother", imgName: "broodmother", positions: [2, 3] },
+            { id: 15, name: "Centaur", imgName: "centaur", positions: [3, 4] },
+            { id: 16, name: "Chaos Knight", imgName: "chaos_knight", positions: [1, 3] },
+            { id: 17, name: "Chen", imgName: "chen", positions: [4, 5] },
+            { id: 18, name: "Clinkz", imgName: "clinkz", positions: [1, 4] },
+            { id: 19, name: "Clockwerk", imgName: "rattletrap", positions: [4, 5] },
+            { id: 20, name: "Crystal Maiden", imgName: "crystal_maiden", positions: [4, 5] },
+            { id: 21, name: "Dark Seer", imgName: "dark_seer", positions: [3, 4] },
+            { id: 22, name: "Dark Willow", imgName: "dark_willow", positions: [4, 5] },
+            { id: 23, name: "Dawnbreaker", imgName: "dawnbreaker", positions: [3, 4] },
+            { id: 24, name: "Dazzle", imgName: "dazzle", positions: [2, 5] },
+            { id: 25, name: "Death Prophet", imgName: "death_prophet", positions: [2, 3] },
+            { id: 26, name: "Disruptor", imgName: "disruptor", positions: [4, 5] },
+            { id: 27, name: "Doom", imgName: "doom_bringer", positions: [3, 4] },
+            { id: 28, name: "Dragon Knight", imgName: "dragon_knight", positions: [2, 3] },
+            { id: 29, name: "Drow Ranger", imgName: "drow_ranger", positions: [1, 2] },
+            { id: 30, name: "Earth Spirit", imgName: "earth_spirit", positions: [2, 4] },
+            { id: 31, name: "Earthshaker", imgName: "earthshaker", positions: [3, 4] },
+            { id: 32, name: "Elder Titan", imgName: "elder_titan", positions: [4, 5] },
+            { id: 33, name: "Ember Spirit", imgName: "ember_spirit", positions: [1, 2] },
+            { id: 34, name: "Enchantress", imgName: "enchantress", positions: [4, 5] },
+            { id: 35, name: "Enigma", imgName: "enigma", positions: [3, 4] },
+            { id: 36, name: "Faceless Void", imgName: "faceless_void", positions: [1, 3] },
+            { id: 37, name: "Grimstroke", imgName: "grimstroke", positions: [4, 5] },
+            { id: 38, name: "Gyrocopter", imgName: "gyrocopter", positions: [1, 4] },
+            { id: 39, name: "Hoodwink", imgName: "hoodwink", positions: [2, 4] },
+            { id: 40, name: "Huskar", imgName: "huskar", positions: [1, 2] },
+            { id: 41, name: "Invoker", imgName: "invoker", positions: [2, 4] },
+            { id: 42, name: "Io", imgName: "wisp", positions: [4, 5] },
+            { id: 43, name: "Jakiro", imgName: "jakiro", positions: [4, 5] },
+            { id: 44, name: "Juggernaut", imgName: "juggernaut", positions: [1, 2] },
+            { id: 45, name: "KOTL", imgName: "keeper_of_the_light", positions: [4, 5] },
+            { id: 46, name: "Kunkka", imgName: "kunkka", positions: [2, 3] },
+            { id: 47, name: "Legion", imgName: "legion_commander", positions: [1, 3] },
+            { id: 48, name: "Leshrac", imgName: "leshrac", positions: [2, 4] },
+            { id: 49, name: "Lich", imgName: "lich", positions: [4, 5] },
+            { id: 50, name: "Lifestealer", imgName: "life_stealer", positions: [1, 3] },
+            { id: 51, name: "Lina", imgName: "lina", positions: [1, 2] },
+            { id: 52, name: "Lion", imgName: "lion", positions: [4, 5] },
+            { id: 53, name: "Lone Druid", imgName: "lone_druid", positions: [1, 3] },
+            { id: 54, name: "Luna", imgName: "luna", positions: [1, 4] },
+            { id: 55, name: "Lycan", imgName: "lycan", positions: [1, 3] },
+            { id: 56, name: "Magnus", imgName: "magnataur", positions: [2, 3] },
+            { id: 57, name: "Marci", imgName: "marci", positions: [3, 4] },
+            { id: 58, name: "Mars", imgName: "mars", positions: [2, 3] },
+            { id: 59, name: "Medusa", imgName: "medusa", positions: [1, 2] },
+            { id: 60, name: "Meepo", imgName: "meepo", positions: [1, 2] },
+            { id: 61, name: "Mirana", imgName: "mirana", positions: [2, 4] },
+            { id: 62, name: "Monkey King", imgName: "monkey_king", positions: [1, 2] },
+            { id: 63, name: "Morphling", imgName: "morphling", positions: [1, 2] },
+            { id: 64, name: "Muerta", imgName: "muerta", positions: [1, 2] },
+            { id: 65, name: "Naga Siren", imgName: "naga_siren", positions: [1, 4] },
+            { id: 66, name: "Nature", imgName: "furion", positions: [4, 5] },
+            { id: 67, name: "Necrophos", imgName: "necrolyte", positions: [2, 3] },
+            { id: 68, name: "Night Stalker", imgName: "night_stalker", positions: [2, 3] },
+            { id: 69, name: "Nyx", imgName: "nyx_assassin", positions: [2, 4] },
+            { id: 70, name: "Ogre Magi", imgName: "ogre_magi", positions: [3, 5] },
+            { id: 71, name: "Omniknight", imgName: "omniknight", positions: [3, 5] },
+            { id: 72, name: "Oracle", imgName: "oracle", positions: [4, 5] },
+            { id: 73, name: "OD", imgName: "obsidian_destroyer", positions: [1, 2] },
+            { id: 74, name: "Pangolier", imgName: "pangolier", positions: [2, 3] },
+            { id: 75, name: "PA", imgName: "phantom_assassin", positions: [1, 2] },
+            { id: 76, name: "PL", imgName: "phantom_lancer", positions: [1, 2] },
+            { id: 77, name: "Phoenix", imgName: "phoenix", positions: [3, 4] },
+            { id: 78, name: "Primal Beast", imgName: "primal_beast", positions: [2, 3] },
+            { id: 79, name: "Puck", imgName: "puck", positions: [2, 4] },
+            { id: 80, name: "Pudge", imgName: "pudge", positions: [1, 4] },
+            { id: 81, name: "Pugna", imgName: "pugna", positions: [2, 4] },
+            { id: 82, name: "QOP", imgName: "queenofpain", positions: [2, 4] },
+            { id: 83, name: "Razor", imgName: "razor", positions: [1, 3] },
+            { id: 84, name: "Riki", imgName: "riki", positions: [1, 4] },
+            { id: 85, name: "Rubick", imgName: "rubick", positions: [2, 4] },
+            { id: 86, name: "Sand King", imgName: "sand_king", positions: [3, 4] },
+            { id: 87, name: "Shadow Demon", imgName: "shadow_demon", positions: [4, 5] },
+            { id: 88, name: "SF", imgName: "nevermore", positions: [1, 2] },
+            { id: 89, name: "Shadow Shaman", imgName: "shadow_shaman", positions: [4, 5] },
+            { id: 90, name: "Silencer", imgName: "silencer", positions: [2, 5] },
+            { id: 91, name: "Skywrath", imgName: "skywrath_mage", positions: [2, 4] },
+            { id: 92, name: "Slardar", imgName: "slardar", positions: [1, 3] },
+            { id: 93, name: "Slark", imgName: "slark", positions: [1, 2] },
+            { id: 94, name: "Snapfire", imgName: "snapfire", positions: [2, 4] },
+            { id: 95, name: "Sniper", imgName: "sniper", positions: [1, 2] },
+            { id: 96, name: "Spectre", imgName: "spectre", positions: [1, 3] },
+            { id: 97, name: "Spirit Breaker", imgName: "spirit_breaker", positions: [3, 4] },
+            { id: 98, name: "Storm Spirit", imgName: "storm_spirit", positions: [2, 4] },
+            { id: 99, name: "Sven", imgName: "sven", positions: [1, 3] },
+            { id: 100, name: "Techies", imgName: "techies", positions: [2, 4] },
+
+            // --- НОВЫЕ ГЕРОИ И ПРОПУЩЕННЫЕ (101-126) ---
+            { id: 101, name: "Templar Assassin", imgName: "templar_assassin", positions: [1, 2] },
+            { id: 102, name: "Terrorblade", imgName: "terrorblade", positions: [1, 2] },
+            { id: 103, name: "Tidehunter", imgName: "tidehunter", positions: [3, 4] },
+            { id: 104, name: "Timbersaw", imgName: "shredder", positions: [2, 3] },
+            { id: 105, name: "Tinker", imgName: "tinker", positions: [2, 4] },
+            { id: 106, name: "Tiny", imgName: "tiny", positions: [2, 4] },
+            { id: 107, name: "Treant Protector", imgName: "treant", positions: [4, 5] },
+            { id: 108, name: "Troll Warlord", imgName: "troll_warlord", positions: [1, 2] },
+            { id: 109, name: "Tusk", imgName: "tusk", positions: [3, 4] },
+            { id: 110, name: "Underlord", imgName: "abyssal_underlord", positions: [3, 5] },
+            { id: 111, name: "Undying", imgName: "undying", positions: [4, 5] },
+            { id: 112, name: "Ursa", imgName: "ursa", positions: [1, 2] },
+            { id: 113, name: "Vengeful Spirit", imgName: "vengefulspirit", positions: [4, 5] },
+            { id: 114, name: "Venomancer", imgName: "venomancer", positions: [3, 4] },
+            { id: 115, name: "Viper", imgName: "viper", positions: [2, 3] },
+            { id: 116, name: "Visage", imgName: "visage", positions: [2, 3] },
+            { id: 117, name: "Void Spirit", imgName: "void_spirit", positions: [2, 4] },
+            { id: 118, name: "Warlock", imgName: "warlock", positions: [4, 5] },
+            { id: 119, name: "Weaver", imgName: "weaver", positions: [1, 4] },
+            { id: 120, name: "Windranger", imgName: "windrunner", positions: [2, 4] },
+            { id: 121, name: "Winter Wyvern", imgName: "winter_wyvern", positions: [4, 5] },
+            { id: 122, name: "Witch Doctor", imgName: "witch_doctor", positions: [4, 5] },
+            { id: 123, name: "Wraith King", imgName: "skeleton_king", positions: [1, 3] },
+            { id: 124, name: "Zeus", imgName: "zuus", positions: [2, 4] },
+            { id: 125, name: "Ringmaster", imgName: "ringmaster", positions: [4, 5] },
+            { id: 126, name: "Kez", imgName: "kez", positions: [1, 2] }
         ];
 
         // Step 4: Hydrate a hero ID to full object
@@ -329,7 +461,9 @@
         function isAdmin() { return roomData.hostUid && roomData.hostUid === localUser.uid; }
 
         function getCurrentPickPlayer() {
-            const totalPicks = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
+            const picksDireArr = Object.values(roomData.picksDire || {});
+            const totalPicks = picksRadiantArr.length + picksDireArr.length;
             const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
             if (totalPicks >= totalExpected) return null;
 
@@ -339,7 +473,7 @@
                 if (totalPicks < acc) {
                     const playersArr = Object.values(roomData.players || {});
                     const teamPlayers = playersArr.filter(p => p.team === step.team).sort((a, b) => a.slot - b.slot);
-                    const playerIndex = (step.team === 'Radiant' ? (roomData.picksRadiant?.length || 0) : (roomData.picksDire?.length || 0));
+                    const playerIndex = (step.team === 'Radiant' ? picksRadiantArr.length : picksDireArr.length);
                     return teamPlayers[playerIndex] || null;
                 }
             } return null;
@@ -355,14 +489,14 @@
         const applyOptimistic = (u) => {
             if (!u) return;
             // 1. Accumulate all updates into _pendingUpdate
-            for(let k in u) _pendingUpdate[k] = u[k];
+            for (let k in u) _pendingUpdate[k] = u[k];
 
             // 2. Optimistic local update of roomData
             for (let k in u) {
                 if (k.includes('.')) {
                     const pts = k.split('.'); let o = roomData;
-                    for (let i = 0; i < pts.length-1; i++) { if(!o[pts[i]]) o[pts[i]] = {}; o = o[pts[i]]; }
-                    o[pts[pts.length-1]] = u[k];
+                    for (let i = 0; i < pts.length - 1; i++) { if (!o[pts[i]]) o[pts[i]] = {}; o = o[pts[i]]; }
+                    o[pts[pts.length - 1]] = u[k];
                 } else roomData[k] = u[k];
             }
             render();
@@ -370,7 +504,7 @@
 
         const updateRoom = async (u, immediate = false) => {
             if (isLocalMode) { applyOptimistic(u); return; }
-            
+
             applyOptimistic(u);
 
             if (immediate) {
@@ -379,7 +513,7 @@
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
                 } finally {
-                    for(let k in toSend) { if(_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
+                    for (let k in toSend) { if (_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
                 }
             } else {
                 if (_debounceTimer) clearTimeout(_debounceTimer);
@@ -390,7 +524,7 @@
                         try {
                             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
                         } finally {
-                            for(let k in toSend) { if(_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
+                            for (let k in toSend) { if (_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
                         }
                     }
                 }, 500);
@@ -403,7 +537,7 @@
             // Optimistic pre-apply (only local, no Firestore write scheduled yet)
             const optimistic = updateFn(roomData);
             applyOptimistic(optimistic);
-            
+
             try {
                 await runTransaction(db, async (transaction) => {
                     const snap = await transaction.get(ref);
@@ -416,7 +550,7 @@
                 // Silent retry or partial failure handled by onSnapshot
             } finally {
                 if (optimistic) {
-                    for(let k in optimistic) { if(_pendingUpdate[k] === optimistic[k]) delete _pendingUpdate[k]; }
+                    for (let k in optimistic) { if (_pendingUpdate[k] === optimistic[k]) delete _pendingUpdate[k]; }
                 }
             }
         };
@@ -427,6 +561,7 @@
             _finalizingTurn = true;
             if (botActionTimeout) { clearTimeout(botActionTimeout); botActionTimeout = null; }
             try {
+                const bansArr = Object.values(roomData.bans || {});
                 if (roomData.stage === 'banning') {
                     const playersArr = Object.values(roomData.players || {});
                     const teamVotes = Object.entries(roomData.votes || {}).filter(([uid]) => {
@@ -435,25 +570,30 @@
                     }).map(([, hid]) => hid);
                     let winnerId = null;
                     if (teamVotes.length === 0) {
-                        const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id));
+                        const pool = roomData.pool || [];
+                        const avail = pool.filter(id => !bansArr.find(b => b.i === id));
                         winnerId = avail[Math.floor(Math.random() * avail.length)];
                     } else {
                         const counts = {}; teamVotes.forEach(id => counts[id] = (counts[id] || 0) + 1);
                         const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
                         winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
                     }
-                    // Slim ban format: {i: heroId, t: teamName}
-                    const newBans = [...(roomData.bans || []), { i: winnerId, t: roomData.currentTurnTeam }];
-                    const rBMade = newBans.filter(b => b.t === 'Radiant').length;
-                    const dBMade = newBans.filter(b => b.t === 'Dire').length;
+                    const newBanIdx = bansArr.length;
+                    const nextBans = { ...roomData.bans, [newBanIdx]: { i: winnerId, t: roomData.currentTurnTeam } };
+                    const nextBansArr = Object.values(nextBans);
+                    const rBMade = nextBansArr.filter(b => b.t === 'Radiant').length;
+                    const dBMade = nextBansArr.filter(b => b.t === 'Dire').length;
+
                     if (rBMade >= roomData.bansRadiant && dBMade >= roomData.bansDire) {
-                        await updateRoom({ bans: newBans, stage: 'picking', timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null }, true);
+                        await updateRoom({ bans: nextBans, stage: 'picking', timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null }, true);
                     } else {
-                        let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (newBans.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
-                        await updateRoom({ bans: newBans, currentTurnTeam: nextT, timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {} }, true);
+                        let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (nextBansArr.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
+                        await updateRoom({ bans: nextBans, currentTurnTeam: nextT, timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {} }, true);
                     }
                 } else if (roomData.stage === 'picking') {
-                    const total = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+                    const pR = Object.values(roomData.picksRadiant || {});
+                    const pD = Object.values(roomData.picksDire || {});
+                    const total = pR.length + pD.length;
                     const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
                     if (total >= totalExpected) {
                         await updateRoom({ stage: 'result', accelTimerStart: 0 }, true);
@@ -481,29 +621,29 @@
         window.loginOfflineAction = () => { isLocalMode = true; localUser = { uid: "local_" + Math.random().toString(36).substr(2, 4), name: "Player", photo: `https://api.dicebear.com/7.x/avataaars/svg?seed=offline` }; joinRoom("OFFLINE_1"); };
         window.logoutAction = async () => { if (!isLocalMode) await signOut(auth); window.location.reload(); };
         window.joinRoomAction = () => joinRoom(document.getElementById('room-code-input')?.value.trim().toUpperCase() || "BATTLE");
-        window.addBotAction = async () => { 
-            if (!isAdmin()) return; 
-            const botId = 'bot_' + Math.random().toString(36).substr(2, 9); 
+        window.addBotAction = async () => {
+            if (!isAdmin()) return;
+            const botId = 'bot_' + Math.random().toString(36).substr(2, 9);
             const botUser = { uid: botId, name: "Bot " + Math.floor(Math.random() * 99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 };
             updateRoom({ [`players.${botId}`]: botUser }, true);
         };
         window.joinTeamAction = async (team, slot) => {
             const playersArr = Object.values(roomData.players || {});
             if (team !== 'unassigned' && playersArr.find(p => p.team === team && p.slot === slot)) return;
-            updateRoom({ 
-                [`players.${localUser.uid}.team`]: team, 
-                [`players.${localUser.uid}.slot`]: slot 
+            updateRoom({
+                [`players.${localUser.uid}.team`]: team,
+                [`players.${localUser.uid}.slot`]: slot
             }, true);
         };
-        window.kickPlayerAction = async (uid) => { 
-            if (!isAdmin()) return; 
-            updateRoom({ 
-                [`players.${uid}.team`]: 'unassigned', 
-                [`players.${uid}.slot`]: -1 
+        window.kickPlayerAction = async (uid) => {
+            if (!isAdmin()) return;
+            updateRoom({
+                [`players.${uid}.team`]: 'unassigned',
+                [`players.${uid}.slot`]: -1
             }, true);
         };
-        window.shuffleAction = async () => { 
-            if (!isAdmin()) return; 
+        window.shuffleAction = async () => {
+            if (!isAdmin()) return;
             let playersObj = { ...roomData.players };
             let pList = Object.values(playersObj);
             let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
@@ -519,21 +659,21 @@
             });
             updateRoom({ players: playersObj }, true);
         };
-        window.assignBotAction = async (uid) => { 
-            if (!isAdmin()) return; 
+        window.assignBotAction = async (uid) => {
+            if (!isAdmin()) return;
             const pList = Object.values(roomData.players || {});
             const bot = pList.find(p => p.uid === uid);
             if (!bot) return;
             const occR = pList.filter(p => p.team === 'Radiant');
             const occD = pList.filter(p => p.team === 'Dire');
             let poss = [];
-            for(let i=0; i<5; i++) { if(!occR.find(p => p.slot === i)) poss.push({team: 'Radiant', slot: i}); }
-            for(let i=0; i<5; i++) { if(!occD.find(p => p.slot === i)) poss.push({team: 'Dire', slot: i}); }
+            for (let i = 0; i < 5; i++) { if (!occR.find(p => p.slot === i)) poss.push({ team: 'Radiant', slot: i }); }
+            for (let i = 0; i < 5; i++) { if (!occD.find(p => p.slot === i)) poss.push({ team: 'Dire', slot: i }); }
             if (poss.length === 0) return;
             const choice = poss[Math.floor(Math.random() * poss.length)];
-            updateRoom({ 
-                [`players.${uid}.team`]: choice.team, 
-                [`players.${uid}.slot`]: choice.slot 
+            updateRoom({
+                [`players.${uid}.team`]: choice.team,
+                [`players.${uid}.slot`]: choice.slot
             }, true);
         };
         window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, true); };
@@ -557,7 +697,7 @@
             });
             await updateRoom({
                 stage: 'formation', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
-                pool: pl, bans: [], picksRadiant: [], picksDire: [], randomPickIds: [],
+                pool: pl, bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {},
                 timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null
             }, true);
         };
@@ -570,7 +710,7 @@
                 playersObj[uid].slot = -1;
             });
             localSetupPositions = {}; localExcludedIds = new Set();
-            await updateRoom({ stage: 'lobby', players: playersObj, pool: [], bans: [], picksRadiant: [], picksDire: [], randomPickIds: [], votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
+            await updateRoom({ stage: 'lobby', players: playersObj, pool: [], bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {}, votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
         };
 
         window.cancelSetupAction = async () => {
@@ -581,17 +721,17 @@
         window.goBackToLobbyAction = async () => {
             if (!isAdmin()) return;
             if (!confirm("Вы уверены, что хотите прервать драфт и вернуться в лобби? Все текущие пики/баны будут сброшены.")) return;
-            await updateRoom({ 
-                stage: 'lobby', 
-                pool: [], 
-                bans: [], 
-                picksRadiant: [], 
-                picksDire: [], 
-                randomPickIds: [], 
-                votes: {}, 
-                pendingHeroId: null, 
-                isExtraTime: false, 
-                timerStart: 0 
+            await updateRoom({
+                stage: 'lobby',
+                pool: [],
+                bans: {},
+                picksRadiant: {},
+                picksDire: {},
+                randomPickIds: {},
+                votes: {},
+                pendingHeroId: null,
+                isExtraTime: false,
+                timerStart: 0
             }, true);
         };
 
@@ -612,11 +752,12 @@
             if (_actionLock) return;
             const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
             const hId = roomData.pendingHeroId;
-            if (!roomData.pool.includes(hId)) return;
+            if (!roomData.pool?.includes(hId)) return;
             _actionLock = true;
             try {
-                if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant || []), hId], pendingHeroId: null }, true);
-                else await updateRoom({ picksDire: [...(roomData.picksDire || []), hId], pendingHeroId: null }, true);
+                const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
+                const nextIdx = Object.keys(roomData[teamKey] || {}).length;
+                await updateRoom({ [`${teamKey}.${nextIdx}`]: hId, pendingHeroId: null }, true);
                 if (isAdmin()) await finalizeTurn();
             } finally { _actionLock = false; }
         };
@@ -624,14 +765,22 @@
         window.randomPickAction = async () => {
             if (_actionLock) return;
             const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
-            const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !roomData.picksRadiant?.includes(id) && !roomData.picksDire?.includes(id));
+            const bansArr = Object.values(roomData.bans || {});
+            const pR = Object.values(roomData.picksRadiant || {});
+            const pD = Object.values(roomData.picksDire || {});
+            const avail = (roomData.pool || []).filter(id => !bansArr.find(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
             if (avail.length > 0) {
                 _actionLock = true;
                 try {
                     const hId = avail[Math.floor(Math.random() * avail.length)];
-                    const newRandomIds = [...(roomData.randomPickIds || []), hId];
-                    if (turnP.team === 'Radiant') await updateRoom({ picksRadiant: [...(roomData.picksRadiant || []), hId], pendingHeroId: null, randomPickIds: newRandomIds }, true);
-                    else await updateRoom({ picksDire: [...(roomData.picksDire || []), hId], pendingHeroId: null, randomPickIds: newRandomIds }, true);
+                    const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
+                    const nextPIdx = Object.keys(roomData[teamKey] || {}).length;
+                    const nextRIdx = Object.keys(roomData.randomPickIds || {}).length;
+                    await updateRoom({
+                        [`${teamKey}.${nextPIdx}`]: hId,
+                        [`randomPickIds.${nextRIdx}`]: hId,
+                        pendingHeroId: null
+                    }, true);
                     if (isAdmin()) await finalizeTurn();
                 } finally { _actionLock = false; }
             }
@@ -646,7 +795,10 @@
                 await updateRoom({ [`votes.${localUser.uid}`]: heroId }); // safe debounced dot-notation update
             } else if (roomData.stage === 'picking') {
                 const turnP = getCurrentPickPlayer();
-                if (turnP?.uid === localUser.uid && !roomData.bans.find(b => b.i === heroId) && !roomData.picksRadiant?.includes(heroId) && !roomData.picksDire?.includes(heroId)) {
+                const bansArr = Object.values(roomData.bans || {});
+                const pR = Object.values(roomData.picksRadiant || {});
+                const pD = Object.values(roomData.picksDire || {});
+                if (turnP?.uid === localUser.uid && !bansArr.find(b => b.i === heroId) && !pR.includes(heroId) && !pD.includes(heroId)) {
                     roomData.pendingHeroId = heroId; render();
                 }
             }
@@ -804,7 +956,7 @@
             const turnP = getCurrentPickPlayer(), myT = playersArr.find(p => p.uid === localUser.uid)?.team;
             const isMyTurn = turnP && turnP.uid === localUser.uid;
             const isMyAction = !isF && ((isB && roomData.currentTurnTeam === myT) || (roomData.stage === 'picking' && isMyTurn));
-            
+
             const existingProgress = document.getElementById('timer-progress');
             const dashOffset = existingProgress && existingProgress.style.strokeDashoffset ? existingProgress.style.strokeDashoffset : "0";
             const existingText = document.getElementById('turn-timer-text');
@@ -816,10 +968,12 @@
 
             const renderHeroResultEntry = (teamName, size) => {
                 const teamPlayers = Object.values(roomData.players || {}).filter(p => p.team === teamName).sort((a, b) => a.slot - b.slot);
-                const pickIds = teamName === 'Radiant' ? roomData.picksRadiant : roomData.picksDire;
+                const picksObj = teamName === 'Radiant' ? roomData.picksRadiant : roomData.picksDire;
+                const pickIds = Object.values(picksObj || {});
+                const randomIds = Object.values(roomData.randomPickIds || {});
                 return Array(size).fill(0).map((_, i) => {
                     const h = getHeroById(pickIds?.[i]), p = teamPlayers[i];
-                    const isRandom = h && roomData.randomPickIds?.includes(h.id);
+                    const isRandom = h && randomIds.includes(h.id);
                     return `<div class="flex items-center gap-5 p-4 rounded-[2rem] bg-white/5 border border-white/5 overflow-hidden group">
                         <div class="w-24 h-32 rounded-2xl overflow-hidden border-2 border-white/10 shadow-lg relative shrink-0">
                             ${getHeroImg(h)}
@@ -835,13 +989,15 @@
                 }).join('');
             };
 
-            const renderSlots = (tN, pickIds, size) => {
+            const renderSlots = (tN, picksObj, size) => {
                 const tP = Object.values(roomData.players || {}).filter(p => p.team === tN).sort((a, b) => a.slot - b.slot);
+                const pickIds = Object.values(picksObj || {});
+                const randomIds = Object.values(roomData.randomPickIds || {});
                 return Array(size).fill(0).map((_, i) => {
                     const h = getHeroById(pickIds?.[i]), p = tP[i];
                     const activePlayerSlot = (roomData.stage === 'picking' && turnP && p && p.uid === turnP.uid);
-                    const actSlotIdx = roomData.stage === 'picking' && roomData.currentTurnTeam === tN && (pickIds?.length || 0) === i;
-                    const isRandom = h && roomData.randomPickIds?.includes(h.id);
+                    const actSlotIdx = roomData.stage === 'picking' && roomData.currentTurnTeam === tN && pickIds.length === i;
+                    const isRandom = h && randomIds.includes(h.id);
                     const hasVoted = roomData.stage === 'banning' && p && roomData.votes[p.uid];
                     const showBadge = hasVoted && (myT === tN);
                     return `<div class="flex flex-col items-center gap-2">
@@ -873,14 +1029,19 @@
                     <div class="pt-6 border-t border-white/5">
                         <h3 class="text-[9px] font-black text-slate-600 uppercase mb-3 tracking-widest text-center">Banned Heroes</h3>
                         <div class="flex gap-4 justify-center items-center bg-black/30 p-3 rounded-2xl max-w-xl mx-auto border border-white/5">
-                            <div class="flex flex-wrap gap-1 justify-end">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="w-10 h-14 rounded-md overflow-hidden grayscale border-2 border-green-500/30 opacity-70">${getHeroImg(getHeroById(roomData.bans.filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div>
+                            <div class="flex flex-wrap gap-1 justify-end">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="w-10 h-14 rounded-md overflow-hidden grayscale border-2 border-green-500/30 opacity-70">${getHeroImg(getHeroById(Object.values(roomData.bans || {}).filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div>
                             <div class="w-px h-10 bg-white/10 shrink-0"></div>
-                            <div class="flex flex-wrap gap-1 justify-start">${[...Array(roomData.bansDire)].map((_, i) => `<div class="w-10 h-14 rounded-md overflow-hidden grayscale border-2 border-red-600/30 opacity-70">${getHeroImg(getHeroById(roomData.bans.filter(x => x.t === 'Dire')[i]?.i))}</div>`).join('')}</div>
+                            <div class="flex flex-wrap gap-1 justify-start">${[...Array(roomData.bansDire)].map((_, i) => `<div class="w-10 h-14 rounded-md overflow-hidden grayscale border-2 border-red-600/30 opacity-70">${getHeroImg(getHeroById(Object.values(roomData.bans || {}).filter(x => x.t === 'Dire')[i]?.i))}</div>`).join('')}</div>
                         </div>
                     </div>
                     <div class="pt-6 border-t border-white/5">
                         <h3 class="text-[9px] font-black text-slate-600 uppercase mb-4 tracking-widest text-center">Remaining Hero Pool</h3>
-                        <div class="flex flex-wrap items-center justify-center gap-3 pb-6 px-4">${sortedPool.filter(h => !roomData.bans.find(b => b.i === h.id) && !roomData.picksRadiant?.includes(h.id) && !roomData.picksDire?.includes(h.id)).map(h => `<div class="w-12 h-16 rounded-xl border-2 border-white/10 overflow-hidden grayscale opacity-20 transition-all hover:opacity-100 hover:grayscale-0">${getHeroImg(h)}</div>`).join('')}</div>
+                        <div class="flex flex-wrap items-center justify-center gap-3 pb-6 px-4">${sortedPool.filter(h => {
+                    const bans = Object.values(roomData.bans || {});
+                    const pR = Object.values(roomData.picksRadiant || {});
+                    const pD = Object.values(roomData.picksDire || {});
+                    return !bans.find(b => b.i === h.id) && !pR.includes(h.id) && !pD.includes(h.id);
+                }).map(h => `<div class="w-12 h-16 rounded-xl border-2 border-white/10 overflow-hidden grayscale opacity-20 transition-all hover:opacity-100 hover:grayscale-0">${getHeroImg(h)}</div>`).join('')}</div>
                     </div>
                     <div class="flex justify-center pb-8">${isAdmin() ? `<button onclick="startOverAction()" class="px-10 py-3 bg-red-600 text-white rounded-xl font-black uppercase shadow-2xl hover:bg-red-500 transition-all active:scale-95 text-xs">Reset Draft</button>` : ''}</div>
                 </div>`;
@@ -888,13 +1049,21 @@
                 c.innerHTML = `<div class="space-y-6">
                     <div class="flex items-center gap-4 mb-8">
                         ${isAdmin() ? `<button onclick="goBackToLobbyAction()" class="p-4 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:bg-red-600/20 hover:text-red-500 transition-all flex items-center justify-center shadow-xl active:scale-95 shrink-0" title="Отменить драфт и вернуться в лобби"><i data-lucide="arrow-left" class="w-6 h-6 transition-transform group-hover:-translate-x-1"></i></button>` : ''}
-                        <div class="flex-1 flex items-center justify-center gap-2 bg-black/40 p-4 rounded-[2rem] border border-white/5 overflow-x-auto scrollbar-hide shadow-xl">${roomData.draftSequence.map((s, i) => { const totalP = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0); let curI = -1, acc = 0; for (let j = 0; j < roomData.draftSequence.length; j++) { acc += roomData.draftSequence[j].count; if (totalP < acc) { curI = j; break; } } return `<div class="flex items-center gap-2 px-5 py-2 border-2 rounded-2xl font-black transition-all ${i === curI ? 'border-white scale-110 bg-white/10' : (i < curI ? 'opacity-10' : 'opacity-40 border-white/10')} ${s.team === 'Radiant' ? 'text-green-500' : 'text-red-600'}"><span class="text-[10px] uppercase">${s.team[0]}</span><span class="text-xl">+${s.count}</span></div>`; }).join('<div class="w-3 h-px bg-white/5 shrink-0"></div>')}</div>
+                        <div class="flex-1 flex items-center justify-center gap-2 bg-black/40 p-4 rounded-[2rem] border border-white/5 overflow-x-auto scrollbar-hide shadow-xl">${roomData.draftSequence.map((s, i) => {
+                    const totalP = Object.keys(roomData.picksRadiant || {}).length + Object.keys(roomData.picksDire || {}).length;
+                    let curI = -1, acc = 0;
+                    for (let j = 0; j < roomData.draftSequence.length; j++) {
+                        acc += roomData.draftSequence[j].count;
+                        if (totalP < acc) { curI = j; break; }
+                    }
+                    return `<div class="flex items-center gap-2 px-5 py-2 border-2 rounded-2xl font-black transition-all ${i === curI ? 'border-white scale-110 bg-white/10' : (i < curI ? 'opacity-10' : 'opacity-40 border-white/10')} ${s.team === 'Radiant' ? 'text-green-500' : 'text-red-600'}"><span class="text-[10px] uppercase">${s.team[0]}</span><span class="text-xl">+${s.count}</span></div>`;
+                }).join('<div class="w-3 h-px bg-white/5 shrink-0"></div>')}</div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start"><div class="team-card p-8 rounded-[3rem] border-4 transition-all duration-700 ${roomData.currentTurnTeam === 'Radiant' ? 'border-green-500' : 'border-transparent'}"><h3 class="text-2xl font-black text-green-500 mb-6 italic uppercase text-center">RADIANT</h3><div class="grid grid-cols-5 gap-3">${renderSlots('Radiant', roomData.picksRadiant, roomData.teamSizeRadiant)}</div></div>
                         <div class="bg-[#1a1d26] p-8 rounded-[3rem] border-2 border-white/10 text-center shadow-2xl flex flex-col justify-center min-h-[380px] relative overflow-hidden">
                             <div class="absolute top-8 left-1/2 -translate-x-1/2 w-20 h-20">
-                                ${isF ? `<i data-lucide="loader-2" class="w-full h-full text-amber-500 animate-spin"></i><div class="absolute inset-0 flex items-center justify-center text-[10px] font-black italic text-amber-500">INIT</div>` 
-                                : `<svg class="w-full h-full -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle><circle id="timer-progress" cx="50" cy="50" r="45" fill="none" stroke="${roomData.currentTurnTeam === 'Radiant' ? '#22c55e' : '#ef4444'}" stroke-width="8" stroke-dasharray="283" class="timer-circle" style="stroke-dashoffset: ${dashOffset}"></circle></svg><div id="turn-timer-text" class="absolute inset-0 flex items-center justify-center text-3xl font-black italic">${currentTimerText}</div>`}
+                                ${isF ? `<i data-lucide="loader-2" class="w-full h-full text-amber-500 animate-spin"></i><div class="absolute inset-0 flex items-center justify-center text-[10px] font-black italic text-amber-500">INIT</div>`
+                        : `<svg class="w-full h-full -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle><circle id="timer-progress" cx="50" cy="50" r="45" fill="none" stroke="${roomData.currentTurnTeam === 'Radiant' ? '#22c55e' : '#ef4444'}" stroke-width="8" stroke-dasharray="283" class="timer-circle" style="stroke-dashoffset: ${dashOffset}"></circle></svg><div id="turn-timer-text" class="absolute inset-0 flex items-center justify-center text-3xl font-black italic">${currentTimerText}</div>`}
                             </div>
                             <div class="mt-28 flex flex-col items-center">
                                 <div class="text-4xl font-black italic tracking-tight ${isF ? 'text-amber-500' : (isB ? 'text-red-500' : 'text-white')} uppercase leading-none">${isF ? 'POOL GEN' : (isB ? 'BAN' : 'PICK')}</div>
@@ -913,9 +1082,9 @@
                                 <div class="w-full">
                                     <p class="text-[9px] font-black uppercase text-slate-600 mb-2 tracking-widest text-center">${isB ? 'Progress' : 'Banned Heroes'}</p>
                                     <div class="flex gap-2 justify-center items-center">
-                                        <div class="flex gap-1">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="ban-quota-slot border-green-500/20">${getHeroImg(getHeroById(roomData.bans.filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div>
+                                        <div class="flex gap-1">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="ban-quota-slot border-green-500/20">${getHeroImg(getHeroById(Object.values(roomData.bans || {}).filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div>
                                         <div class="w-px h-8 bg-white/5 shrink-0"></div>
-                                        <div class="flex gap-1">${[...Array(roomData.bansDire)].map((_, i) => `<div class="ban-quota-slot border-red-600/20">${getHeroImg(getHeroById(roomData.bans.filter(x => x.t === 'Dire')[i]?.i))}</div>`).join('')}</div>
+                                        <div class="flex gap-1">${[...Array(roomData.bansDire)].map((_, i) => `<div class="ban-quota-slot border-red-600/20">${getHeroImg(getHeroById(Object.values(roomData.bans || {}).filter(x => x.t === 'Dire')[i]?.i))}</div>`).join('')}</div>
                                     </div>
                                 </div>
                             </div>
@@ -928,35 +1097,37 @@
                             </div>
                             <div class="flex items-center gap-3">
                                 ${myT === roomData.currentTurnTeam ? playersArr.filter(p => p.team === roomData.currentTurnTeam).sort((a, b) => a.slot - b.slot).map(p => {
-                    const v = roomData.votes[p.uid];
-                    return `<div class="flex items-center gap-2 bg-black/40 pr-3 pl-1 py-1 rounded-xl border border-white/5 transition-all ${v ? 'opacity-100' : 'opacity-40'}">
+                            const v = roomData.votes[p.uid];
+                            return `<div class="flex items-center gap-2 bg-black/40 pr-3 pl-1 py-1 rounded-xl border border-white/5 transition-all ${v ? 'opacity-100' : 'opacity-40'}">
                                         <div class="relative">
                                             <img src="${p.photo}" class="w-6 h-6 rounded-lg border ${v ? 'border-green-500 shadow-[0_0_5px_rgba(34,197,94,0.3)]' : 'border-white/10'}">
                                             ${v ? `<div class="absolute -top-1 -right-1 bg-green-500 text-black rounded-full w-3 h-3 flex items-center justify-center border border-black/20"><i data-lucide="check" class="w-2 h-2 stroke-[5px]"></i></div>` : ''}
                                         </div>
                                         <span class="text-[9px] font-black uppercase ${v ? 'text-white' : 'text-slate-500'}">${p.name}</span>
                                     </div>`;
-                }).join('') : (() => {
-                    const tP = playersArr.filter(p => p.team === roomData.currentTurnTeam);
-                    const vC = tP.filter(p => roomData.votes[p.uid]).length;
-                    return `<div class="bg-black/40 px-6 py-3 rounded-xl border border-white/5 flex items-center gap-3"><div class="w-3 h-3 rounded-full ${vC === tP.length && tP.length > 0 ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}"></div><span class="text-[10px] font-black uppercase tracking-widest ${vC === tP.length && tP.length > 0 ? 'text-green-500' : 'text-amber-500'}">${vC} / ${tP.length} VOTES SUBMITTED</span></div>`;
-                })()}
+                        }).join('') : (() => {
+                            const tP = playersArr.filter(p => p.team === roomData.currentTurnTeam);
+                            const vC = tP.filter(p => roomData.votes[p.uid]).length;
+                            return `<div class="bg-black/40 px-6 py-3 rounded-xl border border-white/5 flex items-center gap-3"><div class="w-3 h-3 rounded-full ${vC === tP.length && tP.length > 0 ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}"></div><span class="text-[10px] font-black uppercase tracking-widest ${vC === tP.length && tP.length > 0 ? 'text-green-500' : 'text-amber-500'}">${vC} / ${tP.length} VOTES SUBMITTED</span></div>`;
+                        })()}
                             </div>
                         </div>
                         <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-x-6 gap-y-10">${sortedPool.map((h, idx) => {
-                    const isBan = roomData.bans.find(x => x.i === h.id);
-                    const isPick = roomData.picksRadiant?.includes(h.id) || roomData.picksDire?.includes(h.id);
-                    const activeTeamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
-                    const canSeeVotes = myT === roomData.currentTurnTeam;
-                    const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
-                    const bSize = 8 + (vCount * 4);
-                    const myV = roomData.votes[localUser.uid] === h.id, teamV = canSeeVotes ? playersArr.filter(p => p.team === roomData.currentTurnTeam && roomData.votes[p.uid] === h.id) : [];
-                    const pend = roomData.pendingHeroId === h.id;
-                    const anim = isF, del = sortedPool.length > 0 ? (7 / sortedPool.length) : 0;
-                    return `<div ${!isF ? `onclick="handleHeroClick(${h.id})"` : ''} class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 ${!isF ? 'cursor-pointer' : ''}" style="${anim ? `animation-delay: ${idx * del}s; animation-fill-mode: both;` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && vCount > 0 ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan ? 'hero-banned-fx' : isPick ? 'hero-picked-fx' : ''}">
+                            const isBan = Object.values(roomData.bans || {}).find(x => x.i === h.id);
+                            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
+                            const picksDireArr = Object.values(roomData.picksDire || {});
+                            const isPick = picksRadiantArr.includes(h.id) || picksDireArr.includes(h.id);
+                            const activeTeamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
+                            const canSeeVotes = myT === roomData.currentTurnTeam;
+                            const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
+                            const bSize = 8 + (vCount * 4);
+                            const myV = roomData.votes[localUser.uid] === h.id, teamV = canSeeVotes ? playersArr.filter(p => p.team === roomData.currentTurnTeam && roomData.votes[p.uid] === h.id) : [];
+                            const pend = roomData.pendingHeroId === h.id;
+                            const anim = isF, del = sortedPool.length > 0 ? (7 / sortedPool.length) : 0;
+                            return `<div ${!isF ? `onclick="handleHeroClick(${h.id})"` : ''} class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 ${!isF ? 'cursor-pointer' : ''}" style="${anim ? `animation-delay: ${idx * del}s; animation-fill-mode: both;` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && vCount > 0 ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan ? 'hero-banned-fx' : isPick ? 'hero-picked-fx' : ''}">
                             ${getHeroImg(h)}${isB && vCount > 0 ? `<div class="absolute inset-0 bg-red-600/10 flex items-center justify-center pointer-events-none"><span class="text-white font-black uppercase bg-red-600 px-1.5 rounded -rotate-12 shadow-lg" style="font-size: ${bSize}px">BAN</span></div>` : ''}${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-1.5 rounded">PICK</span></div>` : ''}
                             <div class="absolute top-1 right-1 flex flex-wrap-reverse gap-0.5 justify-end">${teamV.map(v => `<img src="${v.photo}" class="w-4 h-4 rounded-sm border border-white/50 bg-black shadow-md">`).join('')}</div></div><span class="text-[8px] font-black uppercase text-slate-600 group-hover:text-white truncate w-full text-center">${h.name}</span></div>`;
-                }).join('')}</div></div></div>`;
+                        }).join('')}</div></div></div>`;
                 lucide.createIcons();
             }
         };
@@ -975,11 +1146,11 @@
             }
         };
 
-          const timerLogic = () => {
+        const timerLogic = () => {
             if (!roomData.timerStart || roomData.stage === 'result' || roomData.stage === 'entry' || roomData.stage === 'lobby' || roomData.stage === 'setup') return;
             const now = Date.now();
             const playersArr = Object.values(roomData.players || {});
-            
+
             if (roomData.stage === 'formation') {
                 if (isAdmin() && now - roomData.timerStart >= 7000) {
                     const nextStage = (roomData.bansRadiant > 0 || roomData.bansDire > 0) ? 'banning' : 'picking';
@@ -991,7 +1162,7 @@
             const extraDur = 10000;
             const currentTurnMax = roomData.isExtraTime ? extraDur : baseDur;
             const elapsed = now - roomData.timerStart;
- 
+
             const teamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
             const votes = teamMembers.map(p => roomData.votes[p.uid]).filter(Boolean);
             const allVotedSame = votes.length === teamMembers.length && votes.every(v => v === votes[0]) && votes.length > 0;
@@ -1009,7 +1180,8 @@
                             chosenId = teamVotes[Math.floor(Math.random() * teamVotes.length)];
                         } else {
                             // Step 4: pool is ID array, bans use .i
-                            const avail = roomData.pool.filter(id => !roomData.bans.find(b => b.i === id) && !teamVotes.includes(id));
+                            const bansArr = Object.values(roomData.bans || {});
+                            const avail = roomData.pool.filter(id => !bansArr.find(b => b.i === id) && !teamVotes.includes(id));
                             chosenId = (avail.length > 0 ? avail : roomData.pool)[Math.floor(Math.random() * Math.min(avail.length || 1, 5))];
                         }
                         await updateRoom({ [`votes.${botUid}`]: chosenId });
@@ -1033,7 +1205,7 @@
 
             // Bug fix: Admin detects when all picks are done (e.g. a non-host made the last pick).
             if (isAdmin() && roomData.stage === 'picking' && !_finalizingTurn) {
-                const totalPicks = (roomData.picksRadiant?.length || 0) + (roomData.picksDire?.length || 0);
+                const totalPicks = Object.keys(roomData.picksRadiant || {}).length + Object.keys(roomData.picksDire || {}).length;
                 const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
                 if (totalExpected > 0 && totalPicks >= totalExpected) { finalizeTurn(); return; }
             }
@@ -1078,24 +1250,24 @@
 
         const joinRoom = async (code) => {
             // Slim initD: no excludedHeroIds/customHeroPositions, timerStart instead of timerEnd
-            const playersMap = {}; 
+            const playersMap = {};
             playersMap[localUser.uid] = { ...localUser, team: 'unassigned', slot: -1 };
             const initD = {
                 id: code, stage: 'lobby', players: playersMap, hostUid: localUser.uid,
-                nValues: [5, 5, 5, 5, 5], pool: [], bans: [], picksRadiant: [], picksDire: [],
+                nValues: [5, 5, 5, 5, 5], pool: [], bans: {}, picksRadiant: {}, picksDire: {},
                 teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
                 strategyIdx: 0, timerStart: 0, isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant',
                 pendingHeroId: null, pickDuration: 45, infinitePickTime: false,
-                banDuration: 45, infiniteBanTime: false, randomPickIds: []
+                banDuration: 45, infiniteBanTime: false, randomPickIds: {}
             };
             roomData.id = code; // Initialize early for transactions
             if (isLocalMode) { roomData = initD; render(); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
             try {
-                const snap = await getDoc(ref); 
+                const snap = await getDoc(ref);
                 if (!snap.exists()) await setDoc(ref, initD);
                 else await updateRoom({ [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } }, true);
-                
+
                 onSnapshot(ref, d => {
                     if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); }
                     else {
