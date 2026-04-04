@@ -793,13 +793,14 @@
 
         window.confirmPickAction = async () => {
             if (_actionLock) return;
+            const hId = roomData.pendingHeroId; 
+            if (!hId) return;
             _actionLock = true;
             try {
                 let success = false;
                 await transactionalUpdateRoom((data) => {
                     const turnP = getCurrentPickPlayer(data);
                     if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
-                    const hId = data.pendingHeroId;
                     if (!data.pool?.includes(hId)) return null;
 
                     const bansArr = Object.values(data.bans || {});
