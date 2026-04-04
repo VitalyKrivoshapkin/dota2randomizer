@@ -279,16 +279,17 @@
             bansRadiant: 2, bansDire: 2, strategyIdx: 0, timerStart: 0, isExtraTime: false, votes: {},
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5,
             pendingHeroId: null, pickDuration: 20, infinitePickTime: false,
-            banDuration: 20, infiniteBanTime: false, randomPickIds: {}
+            banDuration: 20, infiniteBanTime: false, randomPickIds: {},
+            excludedIds: [17, 42, 60], setupPositions: {}
         };
         let isLocalMode = false;
         let poolAnimationPlayed = true;
         let botActionTimeout = null;
         let tagManagerScrollTop = 0;
 
-        // Step 1: Local-First Setup — never synced to Firestore
-        let localSetupPositions = {}; // { heroId: [pos,...] } override per-hero
-        let localExcludedIds = new Set([17, 42, 60]); // excluded hero IDs (Defaults: Chen, Io, Meepo)
+        // Step 1: Local-First Setup — bridged to Firestore with 1s debounce
+        function getLocalExcludedIds() { return new Set(roomData.excludedIds || []); }
+        function getLocalSetupPositions() { return roomData.setupPositions || {}; }
 
         // Step 2: Debounce state
         let _debounceTimer = null;
@@ -439,7 +440,7 @@
         // Step 4: Hydrate a hero ID to full object
         function getHeroById(id) { return id ? HEROES.find(h => h.id === id) || null : null; }
         // Step 1: During setup reads local state; outside setup reads HEROES defaults
-        function getHeroPositions(heroId) { return localSetupPositions[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; }
+        function getHeroPositions(heroId) { return roomData.setupPositions?.[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; }
         function getStrategies(r, d) {
             const gen = (p) => {
                 let s = [], ra = 0, da = 0, ct = 'Radiant';
@@ -458,20 +459,20 @@
             return 15000;
         }
         function getHeroImg(h) { return h ? `<img src="${CDN_BASE}${h.imgName}.png" class="hero-img" alt="${h.name}" draggable="false">` : ''; }
-        function isAdmin() { return roomData.hostUid && roomData.hostUid === localUser.uid; }
+        function isAdmin(data = roomData) { return data.hostUid && data.hostUid === localUser.uid; }
 
-        function getCurrentPickPlayer() {
-            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
-            const picksDireArr = Object.values(roomData.picksDire || {});
+        function getCurrentPickPlayer(data = roomData) {
+            const picksRadiantArr = Object.values(data.picksRadiant || {});
+            const picksDireArr = Object.values(data.picksDire || {});
             const totalPicks = picksRadiantArr.length + picksDireArr.length;
-            const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
+            const totalExpected = (data.teamSizeRadiant || 0) + (data.teamSizeDire || 0);
             if (totalPicks >= totalExpected) return null;
 
             let acc = 0;
-            for (let step of roomData.draftSequence) {
+            for (let step of data.draftSequence) {
                 acc += step.count;
                 if (totalPicks < acc) {
-                    const playersArr = Object.values(roomData.players || {});
+                    const playersArr = Object.values(data.players || {});
                     const teamPlayers = playersArr.filter(p => p.team === step.team).sort((a, b) => a.slot - b.slot);
                     const playerIndex = (step.team === 'Radiant' ? picksRadiantArr.length : picksDireArr.length);
                     return teamPlayers[playerIndex] || null;
@@ -527,7 +528,7 @@
                             for (let k in toSend) { if (_pendingUpdate[k] === toSend[k]) delete _pendingUpdate[k]; }
                         }
                     }
-                }, 500);
+                }, 1000);
             }
         };
 
@@ -561,48 +562,52 @@
             _finalizingTurn = true;
             if (botActionTimeout) { clearTimeout(botActionTimeout); botActionTimeout = null; }
             try {
-                const bansArr = Object.values(roomData.bans || {});
-                if (roomData.stage === 'banning') {
-                    const playersArr = Object.values(roomData.players || {});
-                    const teamVotes = Object.entries(roomData.votes || {}).filter(([uid]) => {
-                        const p = playersArr.find(x => x.uid === uid);
-                        return p && p.team === roomData.currentTurnTeam;
-                    }).map(([, hid]) => hid);
-                    let winnerId = null;
-                    if (teamVotes.length === 0) {
-                        const pool = roomData.pool || [];
-                        const avail = pool.filter(id => !bansArr.find(b => b.i === id));
-                        winnerId = avail[Math.floor(Math.random() * avail.length)];
-                    } else {
-                        const counts = {}; teamVotes.forEach(id => counts[id] = (counts[id] || 0) + 1);
-                        const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
-                        winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
-                    }
-                    const newBanIdx = bansArr.length;
-                    const nextBans = { ...roomData.bans, [newBanIdx]: { i: winnerId, t: roomData.currentTurnTeam } };
-                    const nextBansArr = Object.values(nextBans);
-                    const rBMade = nextBansArr.filter(b => b.t === 'Radiant').length;
-                    const dBMade = nextBansArr.filter(b => b.t === 'Dire').length;
+                await transactionalUpdateRoom((data) => {
+                    const bansArr = Object.values(data.bans || {});
+                    if (data.stage === 'banning') {
+                        const playersArr = Object.values(data.players || {});
+                        const teamVotes = Object.entries(data.votes || {}).filter(([uid]) => {
+                            const p = playersArr.find(x => x.uid === uid);
+                            return p && p.team === data.currentTurnTeam;
+                        }).map(([, hid]) => hid);
+                        let winnerId = null;
+                        if (teamVotes.length === 0) {
+                            const pool = data.pool || [];
+                            const avail = pool.filter(id => !bansArr.find(b => b.i === id));
+                            if (avail.length === 0) return null; // Should not happen
+                            winnerId = avail[Math.floor(Math.random() * avail.length)];
+                        } else {
+                            const counts = {}; teamVotes.forEach(id => counts[id] = (counts[id] || 0) + 1);
+                            const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
+                            winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
+                        }
+                        const newBanIdx = bansArr.length;
+                        const nextBans = { ...data.bans, [newBanIdx]: { i: winnerId, t: data.currentTurnTeam } };
+                        const nextBansArr = Object.values(nextBans);
+                        const rBMade = nextBansArr.filter(b => b.t === 'Radiant').length;
+                        const dBMade = nextBansArr.filter(b => b.t === 'Dire').length;
 
-                    if (rBMade >= roomData.bansRadiant && dBMade >= roomData.bansDire) {
-                        await updateRoom({ bans: nextBans, stage: 'picking', timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null }, true);
-                    } else {
-                        let nextT = (rBMade < roomData.bansRadiant && dBMade < roomData.bansDire) ? (nextBansArr.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < roomData.bansRadiant ? 'Radiant' : 'Dire');
-                        await updateRoom({ bans: nextBans, currentTurnTeam: nextT, timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {} }, true);
+                        if (rBMade >= data.bansRadiant && dBMade >= data.bansDire) {
+                            return { bans: nextBans, stage: 'picking', timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null };
+                        } else {
+                            let nextT = (rBMade < data.bansRadiant && dBMade < data.bansDire) ? (nextBansArr.length % 2 === 0 ? 'Radiant' : 'Dire') : (rBMade < data.bansRadiant ? 'Radiant' : 'Dire');
+                            return { bans: nextBans, currentTurnTeam: nextT, timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {} };
+                        }
+                    } else if (data.stage === 'picking') {
+                        const pR = Object.values(data.picksRadiant || {});
+                        const pD = Object.values(data.picksDire || {});
+                        const total = pR.length + pD.length;
+                        const totalExpected = (data.teamSizeRadiant || 0) + (data.teamSizeDire || 0);
+                        if (total >= totalExpected) {
+                            return { stage: 'result', accelTimerStart: 0 };
+                        } else {
+                            let acc = 0, nextTeam = 'Radiant';
+                            for (let step of data.draftSequence) { acc += step.count; if (total < acc) { nextTeam = step.team; break; } }
+                            return { currentTurnTeam: nextTeam, timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, pendingHeroId: null };
+                        }
                     }
-                } else if (roomData.stage === 'picking') {
-                    const pR = Object.values(roomData.picksRadiant || {});
-                    const pD = Object.values(roomData.picksDire || {});
-                    const total = pR.length + pD.length;
-                    const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
-                    if (total >= totalExpected) {
-                        await updateRoom({ stage: 'result', accelTimerStart: 0 }, true);
-                    } else {
-                        let acc = 0, nextTeam = 'Radiant';
-                        for (let step of roomData.draftSequence) { acc += step.count; if (total < acc) { nextTeam = step.team; break; } }
-                        await updateRoom({ currentTurnTeam: nextTeam, timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, pendingHeroId: null }, true);
-                    }
-                }
+                    return null;
+                });
             } finally { _finalizingTurn = false; }
         };
 
@@ -628,12 +633,23 @@
             updateRoom({ [`players.${botId}`]: botUser }, true);
         };
         window.joinTeamAction = async (team, slot) => {
-            const playersArr = Object.values(roomData.players || {});
-            if (team !== 'unassigned' && playersArr.find(p => p.team === team && p.slot === slot)) return;
-            updateRoom({
+            const playerUpdate = {
                 [`players.${localUser.uid}.team`]: team,
                 [`players.${localUser.uid}.slot`]: slot
-            }, true);
+            };
+            if (team === 'unassigned') {
+                updateRoom(playerUpdate, true);
+                return;
+            }
+            await transactionalUpdateRoom((data) => {
+                const playersArr = Object.values(data.players || {});
+                const existing = playersArr.find(p => p.team === team && p.slot === slot);
+                if (existing && existing.uid !== localUser.uid) {
+                    console.warn("Slot already taken");
+                    return null;
+                }
+                return playerUpdate;
+            });
         };
         window.kickPlayerAction = async (uid) => {
             if (!isAdmin()) return;
@@ -644,73 +660,100 @@
         };
         window.shuffleAction = async () => {
             if (!isAdmin()) return;
-            let playersObj = { ...roomData.players };
-            let pList = Object.values(playersObj);
-            let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
-            teamPlayers.sort(() => Math.random() - 0.5);
-            let cR = 0, cD = 0;
-            const totalActive = teamPlayers.length;
-            const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
-            teamPlayers.forEach(p => {
-                if (cR < tR && cR < 5) { p.team = 'Radiant'; p.slot = cR++; }
-                else if (cD < 5) { p.team = 'Dire'; p.slot = cD++; }
-                else { p.team = 'unassigned'; p.slot = -1; }
-                playersObj[p.uid] = { ...p };
+            await transactionalUpdateRoom((data) => {
+                let playersObj = { ...data.players };
+                let pList = Object.values(playersObj);
+                let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
+                teamPlayers.sort(() => Math.random() - 0.5);
+                let cR = 0, cD = 0;
+                const totalActive = teamPlayers.length;
+                const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
+                teamPlayers.forEach(p => {
+                    if (cR < tR && cR < 5) { p.team = 'Radiant'; p.slot = cR++; }
+                    else if (cD < 5) { p.team = 'Dire'; p.slot = cD++; }
+                    else { p.team = 'unassigned'; p.slot = -1; }
+                    playersObj[p.uid] = { ...p };
+                });
+                return { players: playersObj };
             });
-            updateRoom({ players: playersObj }, true);
         };
         window.assignBotAction = async (uid) => {
             if (!isAdmin()) return;
-            const pList = Object.values(roomData.players || {});
-            const bot = pList.find(p => p.uid === uid);
-            if (!bot) return;
-            const occR = pList.filter(p => p.team === 'Radiant');
-            const occD = pList.filter(p => p.team === 'Dire');
-            let poss = [];
-            for (let i = 0; i < 5; i++) { if (!occR.find(p => p.slot === i)) poss.push({ team: 'Radiant', slot: i }); }
-            for (let i = 0; i < 5; i++) { if (!occD.find(p => p.slot === i)) poss.push({ team: 'Dire', slot: i }); }
-            if (poss.length === 0) return;
-            const choice = poss[Math.floor(Math.random() * poss.length)];
-            updateRoom({
-                [`players.${uid}.team`]: choice.team,
-                [`players.${uid}.slot`]: choice.slot
-            }, true);
+            await transactionalUpdateRoom((data) => {
+                const pList = Object.values(data.players || {});
+                const bot = pList.find(p => p.uid === uid);
+                if (!bot) return null;
+                const occR = pList.filter(p => p.team === 'Radiant');
+                const occD = pList.filter(p => p.team === 'Dire');
+                let poss = [];
+                for (let i = 0; i < 5; i++) { if (!occR.find(p => p.slot === i)) poss.push({ team: 'Radiant', slot: i }); }
+                for (let i = 0; i < 5; i++) { if (!occD.find(p => p.slot === i)) poss.push({ team: 'Dire', slot: i }); }
+                if (poss.length === 0) return null;
+                const choice = poss[Math.floor(Math.random() * poss.length)];
+                return {
+                    [`players.${uid}.team`]: choice.team,
+                    [`players.${uid}.slot`]: choice.slot
+                };
+            });
         };
-        window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, true); };
-        window.updateNValue = async (i, v) => { if (!isAdmin()) return; let n = [...roomData.nValues]; n[i] = parseInt(v) || 0; updateRoom({ nValues: n }, true); };
-        // Step 1: Local-only — zero Firestore writes during setup
-        window.toggleHeroPosition = (heroId, pos) => { if (!isAdmin()) return; const manager = document.getElementById('hero-tag-manager'); if (manager) tagManagerScrollTop = manager.scrollTop; let cur = localSetupPositions[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; localSetupPositions[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos]; render(); };
-        window.toggleExcludeHero = (id) => { if (!isAdmin()) return; const manager = document.getElementById('hero-tag-manager'); if (manager) tagManagerScrollTop = manager.scrollTop; if (localExcludedIds.has(id)) localExcludedIds.delete(id); else localExcludedIds.add(id); render(); };
+        window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, false); }; // Batch config updates (1s debounce)
+        window.updateNValue = async (i, v) => { if (!isAdmin()) return; await transactionalUpdateRoom((data) => { let n = [...data.nValues]; n[i] = parseInt(v) || 0; return { nValues: n }; }); }; // N-values kept transactional for precision
+        // Step 1: Synced setup with 1s debounce
+        window.toggleHeroPosition = (heroId, pos) => { 
+            if (!isAdmin()) return; 
+            const manager = document.getElementById('hero-tag-manager'); 
+            if (manager) tagManagerScrollTop = manager.scrollTop; 
+            let setupPos = { ...roomData.setupPositions };
+            let cur = setupPos[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; 
+            setupPos[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos]; 
+            updateRoom({ setupPositions: setupPos }, false);
+        };
+        window.toggleExcludeHero = (id) => { 
+            if (!isAdmin()) return; 
+            const manager = document.getElementById('hero-tag-manager'); 
+            if (manager) tagManagerScrollTop = manager.scrollTop; 
+            let excl = [...(roomData.excludedIds || [])];
+            if (excl.includes(id)) excl = excl.filter(x => x !== id); else excl.push(id);
+            updateRoom({ excludedIds: excl }, false);
+        };
         // Step 1: Unified function — computes pool locally, ONE write to start banning
         window.startDraftAction = async () => {
             if (!isAdmin()) return;
-            const playersArr = Object.values(roomData.players || {});
-            const r = playersArr.filter(x => x.team === 'Radiant').length;
-            const d = playersArr.filter(x => x.team === 'Dire').length;
-            const seq = getStrategies(r, d)[roomData.strategyIdx].seq;
-            let pl = []; let used = new Set();
-            roomData.nValues.forEach((n, i) => {
-                const pos = i + 1;
-                HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !localExcludedIds.has(h.id))
-                    .sort(() => 0.5 - Math.random()).slice(0, n)
-                    .forEach(h => { used.add(h.id); pl.push(h.id); }); // IDs only
+            await transactionalUpdateRoom((data) => {
+                if (data.stage !== 'setup') return null;
+                const playersArr = Object.values(data.players || {});
+                const r = playersArr.filter(x => x.team === 'Radiant').length;
+                const d = playersArr.filter(x => x.team === 'Dire').length;
+                const strats = getStrategies(r, d);
+                const seq = (strats[data.strategyIdx] || strats[0]).seq;
+                let pl = []; let used = new Set();
+                data.nValues.forEach((n, i) => {
+                    const pos = i + 1;
+                    const excludedSet = new Set(data.excludedIds || []);
+                    HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excludedSet.has(h.id))
+                        .sort(() => 0.5 - Math.random()).slice(0, n)
+                        .forEach(h => { used.add(h.id); pl.push(h.id); });
+                });
+                return {
+                    stage: 'formation', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
+                    pool: pl, bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {},
+                    timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null
+                };
             });
-            await updateRoom({
-                stage: 'formation', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
-                pool: pl, bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {},
-                timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null
-            }, true);
         };
 
         window.startOverAction = async () => {
             if (!isAdmin()) return;
-            const playersObj = { ...roomData.players };
-            Object.keys(playersObj).forEach(uid => {
-                playersObj[uid].team = 'unassigned';
-                playersObj[uid].slot = -1;
+            if (!confirm("Reset entire lobby? All participants will be moved to unassigned.")) return;
+            await transactionalUpdateRoom((data) => {
+                const playersObj = { ...data.players };
+                Object.keys(playersObj).forEach(uid => {
+                    playersObj[uid].team = 'unassigned';
+                    playersObj[uid].slot = -1;
+                });
+                return { stage: 'lobby', players: playersObj, pool: [], bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {}, votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0, excludedIds: [17, 42, 60], setupPositions: {} };
             });
             localSetupPositions = {}; localExcludedIds = new Set([17, 42, 60]);
-            await updateRoom({ stage: 'lobby', players: playersObj, pool: [], bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {}, votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0 }, true);
         };
 
         window.cancelSetupAction = async () => {
@@ -744,46 +787,65 @@
                 alert("Both teams must have at least one player or bot to start.");
                 return;
             }
-            localSetupPositions = {}; localExcludedIds = new Set([17, 42, 60]);
-            updateRoom({ stage: 'setup' }, true);
+            // Reset setup state when entering setup stage
+            updateRoom({ stage: 'setup', excludedIds: [17, 42, 60], setupPositions: {} }, true);
         };
 
         window.confirmPickAction = async () => {
             if (_actionLock) return;
-            const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
-            const hId = roomData.pendingHeroId;
-            if (!roomData.pool?.includes(hId)) return;
             _actionLock = true;
             try {
-                const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
-                const nextIdx = Object.keys(roomData[teamKey] || {}).length;
-                await updateRoom({ [`${teamKey}.${nextIdx}`]: hId, pendingHeroId: null }, true);
-                if (isAdmin()) await finalizeTurn();
+                let success = false;
+                await transactionalUpdateRoom((data) => {
+                    const turnP = getCurrentPickPlayer(data);
+                    if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
+                    const hId = data.pendingHeroId;
+                    if (!data.pool?.includes(hId)) return null;
+
+                    const bansArr = Object.values(data.bans || {});
+                    const pR = Object.values(data.picksRadiant || {});
+                    const pD = Object.values(data.picksDire || {});
+                    if (bansArr.some(b => b.i === hId) || pR.includes(hId) || pD.includes(hId)) {
+                        console.warn("Hero already picked or banned");
+                        return null;
+                    }
+
+                    const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
+                    const nextIdx = Object.keys(data[teamKey] || {}).length;
+                    success = true;
+                    return { [`${teamKey}.${nextIdx}`]: hId, pendingHeroId: null };
+                });
+                if (success && isAdmin()) await finalizeTurn();
             } finally { _actionLock = false; }
         };
 
         window.randomPickAction = async () => {
             if (_actionLock) return;
-            const turnP = getCurrentPickPlayer(); if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin() && turnP.uid.startsWith('bot')))) return;
-            const bansArr = Object.values(roomData.bans || {});
-            const pR = Object.values(roomData.picksRadiant || {});
-            const pD = Object.values(roomData.picksDire || {});
-            const avail = (roomData.pool || []).filter(id => !bansArr.find(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
-            if (avail.length > 0) {
-                _actionLock = true;
-                try {
+            _actionLock = true;
+            try {
+                let success = false;
+                await transactionalUpdateRoom((data) => {
+                    const turnP = getCurrentPickPlayer(data);
+                    if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
+                    const bansArr = Object.values(data.bans || {});
+                    const pR = Object.values(data.picksRadiant || {});
+                    const pD = Object.values(data.picksDire || {});
+                    const avail = (data.pool || []).filter(id => !bansArr.some(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
+                    if (avail.length === 0) return null;
+
                     const hId = avail[Math.floor(Math.random() * avail.length)];
                     const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
-                    const nextPIdx = Object.keys(roomData[teamKey] || {}).length;
-                    const nextRIdx = Object.keys(roomData.randomPickIds || {}).length;
-                    await updateRoom({
+                    const nextPIdx = Object.keys(data[teamKey] || {}).length;
+                    const nextRIdx = Object.keys(data.randomPickIds || {}).length;
+                    success = true;
+                    return {
                         [`${teamKey}.${nextPIdx}`]: hId,
                         [`randomPickIds.${nextRIdx}`]: hId,
                         pendingHeroId: null
-                    }, true);
-                    if (isAdmin()) await finalizeTurn();
-                } finally { _actionLock = false; }
-            }
+                    };
+                });
+                if (success && isAdmin()) await finalizeTurn();
+            } finally { _actionLock = false; }
         };
 
         window.handleHeroClick = async (heroId) => {
@@ -853,7 +915,8 @@
             const isValid = totalPool >= neededHeroes && rPlayers > 0 && dPlayers > 0;
             const strats = getStrategies(rPlayers, dPlayers);
             const host = isAdmin();
-            const posCounts = [1, 2, 3, 4, 5].map(p => HEROES.filter(h => getHeroPositions(h.id).includes(p) && !localExcludedIds.has(h.id)).length);
+            const excludedSet = new Set(roomData.excludedIds || []);
+            const posCounts = [1, 2, 3, 4, 5].map(p => HEROES.filter(h => getHeroPositions(h.id).includes(p) && !excludedSet.has(h.id)).length);
 
             c.innerHTML = `<div class="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
                 <div class="relative flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/5 mb-8 gap-6">
@@ -932,7 +995,7 @@
                                 <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">Active Heroes</h3>
                                 <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-3 gap-3">
-                                        ${HEROES.filter(h => !localExcludedIds.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
+                                        ${HEROES.filter(h => !excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
                                             const hPos = getHeroPositions(h.id);
                                             return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
                                                 <div onclick="toggleExcludeHero(${h.id})" class="w-full aspect-[3/4] rounded-lg overflow-hidden cursor-pointer border-2 border-white/5 group-hover:border-white/30 transition-all">${getHeroImg(h)}</div>
@@ -946,7 +1009,7 @@
                                 <h3 class="text-[10px] font-black uppercase text-red-500 border-b border-white/5 pb-2">Ban List</h3>
                                 <div id="hero-ban-list" class="bg-red-500/5 rounded-[2rem] border border-red-500/10 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-2 gap-3">
-                                        ${HEROES.filter(h => localExcludedIds.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
+                                        ${HEROES.filter(h => excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
                                             return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
                                                 <div class="w-full aspect-[3/4] rounded-lg overflow-hidden grayscale opacity-50 group-hover:opacity-100 group-hover:grayscale-0 transition-all">${getHeroImg(h)}</div>
                                                 <span class="text-[8px] font-black uppercase text-red-500 truncate w-full text-center">${h.name}</span>
@@ -1275,15 +1338,21 @@
                 teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
                 strategyIdx: 0, timerStart: 0, isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant',
                 pendingHeroId: null, pickDuration: 45, infinitePickTime: false,
-                banDuration: 45, infiniteBanTime: false, randomPickIds: {}
+                banDuration: 45, infiniteBanTime: false, randomPickIds: {},
+                excludedIds: [17, 42, 60], setupPositions: {}
             };
             roomData.id = code; // Initialize early for transactions
             if (isLocalMode) { roomData = initD; render(); return; }
             const ref = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
             try {
                 const snap = await getDoc(ref);
-                if (!snap.exists()) await setDoc(ref, initD);
-                else await updateRoom({ [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } }, true);
+                if (!snap.exists()) {
+                    await setDoc(ref, initD);
+                } else {
+                    await transactionalUpdateRoom((data) => {
+                        return { [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } };
+                    });
+                }
 
                 onSnapshot(ref, d => {
                     if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); }
