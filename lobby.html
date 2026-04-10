@@ -200,10 +200,22 @@
 
         /* --- EMOJI CHAT SYSTEM --- */
         @keyframes emoji-float {
-            0% { transform: translate(0, 0) scale(0.5) rotate(0deg); opacity: 0; }
-            10% { transform: translate(var(--x-offset), -30px) scale(1.3) rotate(var(--rotate)); opacity: 1; }
-            100% { transform: translate(var(--x-spread), -150px) scale(1) rotate(calc(var(--rotate) * 2)); opacity: 0; }
+            0% {
+                transform: translate(0, 0) scale(0.5) rotate(0deg);
+                opacity: 0;
+            }
+
+            10% {
+                transform: translate(var(--x-offset), -30px) scale(1.3) rotate(var(--rotate));
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(var(--x-spread), -150px) scale(1) rotate(calc(var(--rotate) * 2));
+                opacity: 0;
+            }
         }
+
         .floating-emoji {
             position: absolute;
             pointer-events: none;
@@ -212,8 +224,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
+
         .emoji-picker {
             transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
             transform: translateY(10px) scale(0.9);
@@ -221,18 +234,22 @@
             pointer-events: none;
             filter: blur(10px);
         }
+
         .emoji-picker.active {
             transform: translateY(0) scale(1);
             opacity: 1;
             pointer-events: auto;
             filter: blur(0);
         }
+
         .emoji-btn {
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         .emoji-btn:hover {
             transform: scale(1.3) rotate(5deg);
         }
+
         .emoji-btn:active {
             transform: scale(0.9);
         }
@@ -379,7 +396,7 @@
                 // Play a single silent/brief sound to unlock the browser's audio policy
                 const dummy = this.sfx['button_click'];
                 if (dummy) {
-                    dummy.play().catch(() => {});
+                    dummy.play().catch(() => { });
                 }
             },
             play(name) {
@@ -392,10 +409,10 @@
                 s.play().catch(e => {
                     console.warn(`Audio ${name} blocked:`, e);
                     // Add listener to play on next click if blocked
-                    const unlocker = () => { 
+                    const unlocker = () => {
                         console.log(`Retrying blocked audio: ${name}`);
-                        if (!this.isMuted) s.play(); 
-                        document.removeEventListener('mousedown', unlocker); 
+                        if (!this.isMuted) s.play();
+                        document.removeEventListener('mousedown', unlocker);
                     };
                     document.addEventListener('mousedown', unlocker);
                 });
@@ -494,7 +511,7 @@
                     }
                     lastAudioState.turnTeam = data.currentTurnTeam;
                 }
-                
+
                 const currentPickerUid = turnP?.uid || '';
                 if (data.stage === 'picking' && currentPickerUid !== lastAudioState.pickerUid) {
                     if (currentPickerUid === localUser.uid) {
@@ -963,21 +980,21 @@
         window.updateField = async (f, v) => { if (!isAdmin()) return; updateRoom({ [f]: v }, false); }; // Batch config updates (1s debounce)
         window.updateNValue = async (i, v) => { if (!isAdmin()) return; await transactionalUpdateRoom((data) => { let n = [...data.nValues]; n[i] = parseInt(v) || 0; return { nValues: n }; }); }; // N-values kept transactional for precision
         // Step 1: Synced setup with 1s debounce
-        window.toggleHeroPosition = (heroId, pos) => { 
-            if (!isAdmin()) return; 
+        window.toggleHeroPosition = (heroId, pos) => {
+            if (!isAdmin()) return;
             SoundManager.play('button_click');
-            const manager = document.getElementById('hero-tag-manager'); 
-            if (manager) tagManagerScrollTop = manager.scrollTop; 
+            const manager = document.getElementById('hero-tag-manager');
+            if (manager) tagManagerScrollTop = manager.scrollTop;
             let setupPos = { ...roomData.setupPositions };
-            let cur = setupPos[heroId] || HEROES.find(h => h.id === heroId)?.positions || []; 
-            setupPos[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos]; 
+            let cur = setupPos[heroId] || HEROES.find(h => h.id === heroId)?.positions || [];
+            setupPos[heroId] = cur.includes(pos) ? cur.filter(p => p !== pos) : [...cur, pos];
             updateRoom({ setupPositions: setupPos }, false);
         };
-        window.toggleExcludeHero = (id) => { 
-            if (!isAdmin()) return; 
+        window.toggleExcludeHero = (id) => {
+            if (!isAdmin()) return;
             SoundManager.play('button_click');
-            const manager = document.getElementById('hero-tag-manager'); 
-            if (manager) tagManagerScrollTop = manager.scrollTop; 
+            const manager = document.getElementById('hero-tag-manager');
+            if (manager) tagManagerScrollTop = manager.scrollTop;
             let excl = [...(roomData.excludedIds || [])];
             if (excl.includes(id)) excl = excl.filter(x => x !== id); else excl.push(id);
             updateRoom({ excludedIds: excl }, false);
@@ -1079,12 +1096,12 @@
 
         window.confirmPickAction = async (automated = false) => {
             if (_actionLock) return;
-            const hId = roomData.pendingHeroId; 
+            const hId = roomData.pendingHeroId;
             if (!hId) return;
-            
+
             const turnP = getCurrentPickPlayer();
             const isForMe = turnP?.uid === localUser.uid;
-            
+
             _actionLock = true;
             if (!automated && isForMe) {
                 SoundManager.play('hero_picked');
@@ -1121,10 +1138,10 @@
 
         window.randomPickAction = async (automated = false) => {
             if (_actionLock) return;
-            
+
             const turnP = getCurrentPickPlayer();
             const isForMe = turnP?.uid === localUser.uid;
-            
+
             _actionLock = true;
             if (!automated && isForMe) {
                 SoundManager.play('hero_picked');
@@ -1162,7 +1179,7 @@
                 }
             } finally { _actionLock = false; }
         };
-        
+
         window.sendReactionAction = (emoji) => {
             if (!localUser.uid) return;
             // Debounce handled by updateRoom logic
@@ -1173,28 +1190,28 @@
                     user: localUser.name,
                     photo: localUser.photo
                 }
-            }, true); // Force immediate sync for reactive feel
+            }, false); // Enabled batching (immediate=false) to prevent DB spam; optimistic UI handles local feel
             SoundManager.play('button_click');
         };
 
         function spawnFloatingEmoji(emoji, name, photo) {
             const overlay = document.getElementById('reaction-overlay');
             if (!overlay) return;
-            
+
             const el = document.createElement('div');
             el.className = 'floating-emoji';
-            
+
             // Randomize position within center area
             const randomX = Math.floor(Math.random() * 200) - 100;
             const xSpread = randomX * 2;
             const rotate = Math.floor(Math.random() * 60) - 30;
-            
+
             el.style.setProperty('--x-offset', `${randomX}px`);
             el.style.setProperty('--x-spread', `${xSpread}px`);
             el.style.setProperty('--rotate', `${rotate}deg`);
             el.style.left = '50%';
             el.style.bottom = '40%'; // Start near the hero pool
-            
+
             el.innerHTML = `
                 <div class="relative">
                     <img src="${photo}" class="w-8 h-8 rounded-lg border-2 border-white/50 shadow-xl mb-1">
@@ -1202,7 +1219,7 @@
                 </div>
                 <div class="text-4xl filter drop-shadow-lg">${emoji}</div>
             `;
-            
+
             overlay.appendChild(el);
             setTimeout(() => el.remove(), 3000);
         }
@@ -1362,12 +1379,12 @@
                                 <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-3 gap-3">
                                         ${HEROES.filter(h => !excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                                            const hPos = getHeroPositions(h.id);
-                                            return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
+                const hPos = getHeroPositions(h.id);
+                return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
                                                 <div onclick="toggleExcludeHero(${h.id})" class="w-full aspect-[3/4] rounded-lg overflow-hidden cursor-pointer border-2 border-white/5 group-hover:border-white/30 transition-all">${getHeroImg(h)}</div>
                                                 <div class="flex gap-0.5">${[1, 2, 3, 4, 5].map(p => `<span onclick="toggleHeroPosition(${h.id}, ${p})" class="role-tag ${hPos.includes(p) ? 'active' : 'inactive'} text-[6px]">${p}</span>`).join('')}</div>
                                             </div>`;
-                                        }).join('')}
+            }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -1376,11 +1393,11 @@
                                 <div id="hero-ban-list" class="bg-red-500/5 rounded-[2rem] border border-red-500/10 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-2 gap-3">
                                         ${HEROES.filter(h => excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                                            return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
+                return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
                                                 <div class="w-full aspect-[3/4] rounded-lg overflow-hidden grayscale opacity-50 group-hover:opacity-100 group-hover:grayscale-0 transition-all">${getHeroImg(h)}</div>
                                                 <span class="text-[8px] font-black uppercase text-red-500 truncate w-full text-center">${h.name}</span>
                                             </div>`;
-                                        }).join('')}
+            }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -1521,7 +1538,7 @@
                             </div>
                             <div class="mt-4 flex flex-col items-center gap-4 px-4 w-full relative">
                                 <div id="emoji-picker" class="emoji-picker absolute bottom-full mb-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[2.5rem] shadow-2xl z-[200] grid grid-cols-3 gap-3">
-                                    ${['😢','😠','😊','🤔','😂','😱','👍','👋','🔥'].map(e => `<button onclick="sendReactionAction('${e}'); toggleEmojiPicker()" class="emoji-btn text-3xl w-12 h-12 flex items-center justify-center bg-white/5 rounded-2xl hover:bg-white/10 transition-all">${e}</button>`).join('')}
+                                    ${['😢', '😠', '😊', '🤔', '😂', '😱', '👍', '👋', '🔥'].map(e => `<button onclick="sendReactionAction('${e}'); toggleEmojiPicker()" class="emoji-btn text-3xl w-12 h-12 flex items-center justify-center bg-white/5 rounded-2xl hover:bg-white/10 transition-all">${e}</button>`).join('')}
                                 </div>
                                 <div class="flex items-center gap-2">
                                     ${!isB && turnP && (turnP.uid === localUser.uid || (isAdmin() && turnP.uid.startsWith('bot'))) ? `
@@ -1587,10 +1604,10 @@
         const renderHeader = () => {
             const roomDisp = document.getElementById('room-display'), ctrls = document.getElementById('header-controls');
             if (roomDisp) roomDisp.textContent = roomData.id ? `ROOM: ${roomData.id} • ${roomData.stage.toUpperCase()}` : 'DOTA DRAFTER';
-            
+
             const sfxIcon = SoundManager.isMuted ? 'volume-x' : 'volume-2';
             const sfxBtn = `<button onclick="SoundManager.toggleMute()" class="text-slate-500 hover:text-white transition-all flex items-center justify-center p-2" title="Toggle SFX"><i data-lucide="${sfxIcon}" class="w-4 h-4"></i></button>`;
-            
+
             const controlsHtml = `
                 <div class="flex items-center gap-1 bg-white/5 py-1 px-2 rounded-2xl border border-white/5">
                     ${sfxBtn}
@@ -1601,7 +1618,7 @@
                         <button onclick="logoutAction()" class="text-slate-500 hover:text-white p-2"><i data-lucide="log-out" class="w-4 h-4"></i></button>
                     ` : ''}
                 </div>`;
-            
+
             if (ctrls) ctrls.innerHTML = controlsHtml;
             lucide.createIcons();
         };
@@ -1700,7 +1717,7 @@
             }
 
             const leftSec = Math.ceil(rawLeft / 1000);
-            
+
             // Timer SFX thresholds
             if (leftSec === 10 && lastAudioState.timerThreshold !== 10) {
                 SoundManager.play('count_pick_10');
