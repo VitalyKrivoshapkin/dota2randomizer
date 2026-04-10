@@ -250,6 +250,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
         const manualConfig = {
             apiKey: "AIzaSyBOv8Tf0Z-XnSp3DUHstPo7FZyb1SPuAgA",
@@ -265,6 +266,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        const analytics = getAnalytics(app);
         const provider = new GoogleAuthProvider();
 
         const ANIM_DELAY = 5500;
@@ -562,6 +564,11 @@
             _finalizingTurn = true;
             if (botActionTimeout) { clearTimeout(botActionTimeout); botActionTimeout = null; }
             try {
+                let bannedHeroId = null;
+                let bannedTeam = null;
+                let isAutomatedBan = false;
+                let isDraftFinished = false;
+
                 await transactionalUpdateRoom((data) => {
                     const bansArr = Object.values(data.bans || {});
                     if (data.stage === 'banning') {
@@ -574,13 +581,18 @@
                         if (teamVotes.length === 0) {
                             const pool = data.pool || [];
                             const avail = pool.filter(id => !bansArr.find(b => b.i === id));
-                            if (avail.length === 0) return null; // Should not happen
+                            if (avail.length === 0) return null;
                             winnerId = avail[Math.floor(Math.random() * avail.length)];
+                            isAutomatedBan = true;
                         } else {
                             const counts = {}; teamVotes.forEach(id => counts[id] = (counts[id] || 0) + 1);
                             const winners = Object.keys(counts).filter(id => counts[id] === Math.max(...Object.values(counts)));
                             winnerId = parseInt(winners[Math.floor(Math.random() * winners.length)]);
+                            isAutomatedBan = false;
                         }
+                        bannedHeroId = winnerId;
+                        bannedTeam = data.currentTurnTeam;
+
                         const newBanIdx = bansArr.length;
                         const nextBans = { ...data.bans, [newBanIdx]: { i: winnerId, t: data.currentTurnTeam } };
                         const nextBansArr = Object.values(nextBans);
@@ -599,6 +611,7 @@
                         const total = pR.length + pD.length;
                         const totalExpected = (data.teamSizeRadiant || 0) + (data.teamSizeDire || 0);
                         if (total >= totalExpected) {
+                            isDraftFinished = true;
                             return { stage: 'result', accelTimerStart: 0 };
                         } else {
                             let acc = 0, nextTeam = 'Radiant';
@@ -608,6 +621,13 @@
                     }
                     return null;
                 });
+                if (bannedHeroId) {
+                    const h = getHeroById(bannedHeroId);
+                    if (h) logEvent(analytics, 'hero_banned', { hero_id: h.id, hero_name: h.name, team: bannedTeam, is_automated: isAutomatedBan });
+                }
+                if (isDraftFinished) {
+                    logEvent(analytics, 'draft_completed', { room_id: roomData.id });
+                }
             } finally { _finalizingTurn = false; }
         };
 
@@ -719,13 +739,21 @@
         // Step 1: Unified function — computes pool locally, ONE write to start banning
         window.startDraftAction = async () => {
             if (!isAdmin()) return;
+            let finalPool = [];
+            let rCount = 0, dCount = 0;
+            let strategyName = "";
+
             await transactionalUpdateRoom((data) => {
                 if (data.stage !== 'setup') return null;
                 const playersArr = Object.values(data.players || {});
                 const r = playersArr.filter(x => x.team === 'Radiant').length;
                 const d = playersArr.filter(x => x.team === 'Dire').length;
                 const strats = getStrategies(r, d);
-                const seq = (strats[data.strategyIdx] || strats[0]).seq;
+                const strat = (strats[data.strategyIdx] || strats[0]);
+                const seq = strat.seq;
+                strategyName = strat.name;
+                rCount = r; dCount = d;
+
                 let pl = []; let used = new Set();
                 data.nValues.forEach((n, i) => {
                     const pos = i + 1;
@@ -734,12 +762,20 @@
                         .sort(() => 0.5 - Math.random()).slice(0, n)
                         .forEach(h => { used.add(h.id); pl.push(h.id); });
                 });
+                finalPool = pl;
                 return {
                     stage: 'formation', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
                     pool: pl, bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {},
                     timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null
                 };
             });
+            if (finalPool.length > 0) {
+                logEvent(analytics, 'draft_start', { room_id: roomData.id, pool_size: finalPool.length, radiant_count: rCount, dire_count: dCount, strategy: strategyName });
+                finalPool.forEach(id => {
+                    const h = getHeroById(id);
+                    if (h) logEvent(analytics, 'pool_hero_assigned', { hero_id: h.id, hero_name: h.name });
+                });
+            }
         };
 
         window.startOverAction = async () => {
@@ -798,6 +834,7 @@
             _actionLock = true;
             try {
                 let success = false;
+                let curTeam = roomData.currentTurnTeam;
                 await transactionalUpdateRoom((data) => {
                     const turnP = getCurrentPickPlayer(data);
                     if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
@@ -816,7 +853,11 @@
                     success = true;
                     return { [`${teamKey}.${nextIdx}`]: hId, pendingHeroId: null };
                 });
-                if (success && isAdmin()) await finalizeTurn();
+                if (success) {
+                    const h = getHeroById(hId);
+                    if (h) logEvent(analytics, 'hero_picked', { hero_id: h.id, hero_name: h.name, team: curTeam, is_random: false });
+                    if (isAdmin()) await finalizeTurn();
+                }
             } finally { _actionLock = false; }
         };
 
@@ -825,6 +866,8 @@
             _actionLock = true;
             try {
                 let success = false;
+                let pickedId = null;
+                let curTeam = roomData.currentTurnTeam;
                 await transactionalUpdateRoom((data) => {
                     const turnP = getCurrentPickPlayer(data);
                     if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
@@ -835,6 +878,7 @@
                     if (avail.length === 0) return null;
 
                     const hId = avail[Math.floor(Math.random() * avail.length)];
+                    pickedId = hId;
                     const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
                     const nextPIdx = Object.keys(data[teamKey] || {}).length;
                     const nextRIdx = Object.keys(data.randomPickIds || {}).length;
@@ -845,7 +889,11 @@
                         pendingHeroId: null
                     };
                 });
-                if (success && isAdmin()) await finalizeTurn();
+                if (success) {
+                    const h = getHeroById(pickedId);
+                    if (h) logEvent(analytics, 'hero_picked', { hero_id: h.id, hero_name: h.name, team: curTeam, is_random: true });
+                    if (isAdmin()) await finalizeTurn();
+                }
             } finally { _actionLock = false; }
         };
 
@@ -1349,10 +1397,12 @@
                 const snap = await getDoc(ref);
                 if (!snap.exists()) {
                     await setDoc(ref, initD);
+                    logEvent(analytics, 'lobby_joined', { room_id: code, is_host: true });
                 } else {
                     await transactionalUpdateRoom((data) => {
                         return { [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } };
                     });
+                    logEvent(analytics, 'lobby_joined', { room_id: code, is_host: false });
                 }
 
                 onSnapshot(ref, d => {
