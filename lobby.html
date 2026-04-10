@@ -807,6 +807,7 @@
         window.loginWithGoogle = async () => {
             SoundManager.unlock();
             try {
+                await signInWithPopup(auth, provider);
                 isLocalMode = false;
             } catch (error) {
                 if (error.code === 'auth/user-disabled') {
