@@ -284,9 +284,181 @@
             banDuration: 20, infiniteBanTime: false, randomPickIds: {},
             excludedIds: [17, 42, 60], setupPositions: {}
         };
+
+        // --- AUDIO SYSTEM ---
+        const SoundManager = {
+            sfx: {},
+            music: null,
+            initialized: false,
+            isMuted: false,
+            isMusicMuted: false,
+            init() {
+                if (this.initialized) return;
+                const assets = [
+                    'another_hero_picked', 'button_click', 'count_pick_10', 'count_pick_5', 'draft_finished_1', 'draft_finished_2',
+                    'hero_banned', 'heroes_list_drafted', 'hero_picked', 'hero_select_track', 'team_complete',
+                    'time_extra', 'turn_ban', 'turn_choose_hero', 'welcome'
+                ];
+                assets.forEach(name => {
+                    const audio = new Audio(`Assets/Sfx/${name}.mpeg`);
+                    audio.load(); // Preheat
+                    this.sfx[name] = audio;
+                });
+                this.music = this.sfx['hero_select_track'];
+                if (this.music) {
+                    this.music.loop = true;
+                    this.music.volume = 0.5;
+                }
+                this.initialized = true;
+            },
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                if (this.isMuted) {
+                    this.stopMusic();
+                    Object.values(this.sfx).forEach(s => {
+                        s.pause();
+                        s.currentTime = 0;
+                    });
+                } else {
+                    if (roomData.stage === 'banning' || roomData.stage === 'picking') {
+                        this.startMusic();
+                    }
+                }
+                renderHeader();
+            },
+            unlocked: false,
+            // Call this on a user gesture to unlock all sounds
+            unlock() {
+                if (this.unlocked) return;
+                this.init();
+                this.unlocked = true;
+                console.log("Unlocking audio context...");
+                // Play a single silent/brief sound to unlock the browser's audio policy
+                const dummy = this.sfx['button_click'];
+                if (dummy) {
+                    dummy.play().catch(() => {});
+                }
+            },
+            play(name) {
+                if (this.isMuted) return;
+                if (!this.initialized) this.init();
+                const s = this.sfx[name];
+                if (!s) return;
+                console.log(`Playing SFX: ${name}`);
+                s.currentTime = 0;
+                s.play().catch(e => {
+                    console.warn(`Audio ${name} blocked:`, e);
+                    // Add listener to play on next click if blocked
+                    const unlocker = () => { 
+                        console.log(`Retrying blocked audio: ${name}`);
+                        if (!this.isMuted) s.play(); 
+                        document.removeEventListener('mousedown', unlocker); 
+                    };
+                    document.addEventListener('mousedown', unlocker);
+                });
+            },
+            startMusic() {
+                // Background music disabled per user request
+            },
+            stopMusic() {
+                if (this.music) {
+                    this.music.pause();
+                    this.music.currentTime = 0;
+                }
+            }
+        };
+
+        window.SoundManager = SoundManager;
+
+        let lastAudioState = {
+            stage: '',
+            turnTeam: '',
+            pickerUid: '',
+            extraTime: false,
+            timerThreshold: 0,
+            picksCount: 0,
+            bansCount: 0
+        };
+
+        function checkSoundTriggers() {
+            const data = roomData;
+            if (data.stage === 'entry') return;
+            if (!SoundManager.initialized) SoundManager.init();
+
+            const playersArr = Object.values(data.players || {});
+            const myP = playersArr.find(p => p.uid === localUser.uid);
+            const myTeam = myP ? myP.team : 'unassigned';
+            const turnP = getCurrentPickPlayer(data);
+
+            // Counts-based sounds (check BEFORE turn/stage state updates)
+            const picksCount = Object.keys(data.picksRadiant || {}).length + Object.keys(data.picksDire || {}).length;
+            const bansCount = Object.keys(data.bans || {}).length;
+
+            if (bansCount > lastAudioState.bansCount) {
+                SoundManager.play('hero_banned');
+            }
+            if (picksCount > lastAudioState.picksCount) {
+                // Play another_hero_picked if it wasn't a manual local pick that already played hero_picked
+                if (!_lastPickWasManual) {
+                    SoundManager.play('another_hero_picked');
+                }
+                _lastPickWasManual = false; // Reset
+            }
+            lastAudioState.picksCount = picksCount;
+            lastAudioState.bansCount = bansCount;
+
+            // 1. Stage transitions
+            if (data.stage !== lastAudioState.stage) {
+                console.log(`Stage transition: ${lastAudioState.stage} -> ${data.stage}`);
+                if (data.stage === 'lobby') SoundManager.play('welcome');
+                if (data.stage === 'formation') SoundManager.play('heroes_list_drafted');
+                if (data.stage === 'result') {
+                    SoundManager.stopMusic();
+                    SoundManager.play('team_complete');
+                    const finishSfx = Math.random() < 0.5 ? 'draft_finished_1' : 'draft_finished_2';
+                    setTimeout(() => SoundManager.play(finishSfx), 800);
+                }
+                if (lastAudioState.stage && lastAudioState.stage !== 'lobby' && data.stage === 'lobby') {
+                    SoundManager.stopMusic();
+                }
+                lastAudioState.stage = data.stage;
+            }
+
+            // 2. Turn changes
+            if (data.stage === 'banning' || data.stage === 'picking') {
+                if (data.currentTurnTeam !== lastAudioState.turnTeam) {
+                    if (data.stage === 'banning' && data.currentTurnTeam === myTeam) {
+                        SoundManager.play('turn_ban');
+                    }
+                    lastAudioState.turnTeam = data.currentTurnTeam;
+                }
+                
+                const currentPickerUid = turnP?.uid || '';
+                if (data.stage === 'picking' && currentPickerUid !== lastAudioState.pickerUid) {
+                    if (currentPickerUid === localUser.uid) {
+                        SoundManager.play('turn_choose_hero');
+                    }
+                    lastAudioState.pickerUid = currentPickerUid;
+                }
+            }
+
+            // 3. Extra Time
+            if (data.isExtraTime && !lastAudioState.extraTime) {
+                if (data.currentTurnTeam === myTeam) {
+                    SoundManager.play('time_extra');
+                }
+            }
+            lastAudioState.extraTime = data.isExtraTime;
+        }
+
+        // Global listener to unlock audio context on first interaction
+        window.addEventListener('mousedown', () => {
+            SoundManager.unlock();
+        }, { once: true });
         let isLocalMode = false;
         let poolAnimationPlayed = true;
         let botActionTimeout = null;
+        let _lastPickWasManual = false;
         let tagManagerScrollTop = 0;
 
         // Step 1: Local-First Setup — bridged to Firestore with 1s debounce
@@ -502,6 +674,7 @@
                     o[pts[pts.length - 1]] = u[k];
                 } else roomData[k] = u[k];
             }
+            checkSoundTriggers();
             render();
         };
 
@@ -632,8 +805,8 @@
         };
 
         window.loginWithGoogle = async () => {
+            SoundManager.unlock();
             try {
-                await signInWithPopup(auth, provider);
                 isLocalMode = false;
             } catch (error) {
                 if (error.code === 'auth/user-disabled') {
@@ -643,16 +816,22 @@
                 }
             }
         };
-        window.loginOfflineAction = () => { isLocalMode = true; localUser = { uid: "local_" + Math.random().toString(36).substr(2, 4), name: "Player", photo: `https://api.dicebear.com/7.x/avataaars/svg?seed=offline` }; joinRoom("OFFLINE_1"); };
+        window.loginOfflineAction = () => { SoundManager.play('button_click'); isLocalMode = true; localUser = { uid: "local_" + Math.random().toString(36).substr(2, 4), name: "Player", photo: `https://api.dicebear.com/7.x/avataaars/svg?seed=offline` }; joinRoom("OFFLINE_1"); };
         window.logoutAction = async () => { if (!isLocalMode) await signOut(auth); window.location.reload(); };
-        window.joinRoomAction = () => joinRoom(document.getElementById('room-code-input')?.value.trim().toUpperCase() || "BATTLE");
+        window.joinRoomAction = () => {
+            SoundManager.unlock();
+            SoundManager.play('button_click');
+            joinRoom(document.getElementById('room-code-input')?.value.trim().toUpperCase() || "BATTLE");
+        };
         window.addBotAction = async () => {
             if (!isAdmin()) return;
+            SoundManager.play('button_click');
             const botId = 'bot_' + Math.random().toString(36).substr(2, 9);
             const botUser = { uid: botId, name: "Bot " + Math.floor(Math.random() * 99), photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`, team: 'unassigned', slot: -1 };
             updateRoom({ [`players.${botId}`]: botUser }, true);
         };
         window.joinTeamAction = async (team, slot) => {
+            SoundManager.play('button_click');
             const playerUpdate = {
                 [`players.${localUser.uid}.team`]: team,
                 [`players.${localUser.uid}.slot`]: slot
@@ -680,6 +859,7 @@
         };
         window.shuffleAction = async () => {
             if (!isAdmin()) return;
+            SoundManager.play('button_click');
             await transactionalUpdateRoom((data) => {
                 let playersObj = { ...data.players };
                 let pList = Object.values(playersObj);
@@ -721,6 +901,7 @@
         // Step 1: Synced setup with 1s debounce
         window.toggleHeroPosition = (heroId, pos) => { 
             if (!isAdmin()) return; 
+            SoundManager.play('button_click');
             const manager = document.getElementById('hero-tag-manager'); 
             if (manager) tagManagerScrollTop = manager.scrollTop; 
             let setupPos = { ...roomData.setupPositions };
@@ -730,6 +911,7 @@
         };
         window.toggleExcludeHero = (id) => { 
             if (!isAdmin()) return; 
+            SoundManager.play('button_click');
             const manager = document.getElementById('hero-tag-manager'); 
             if (manager) tagManagerScrollTop = manager.scrollTop; 
             let excl = [...(roomData.excludedIds || [])];
@@ -739,6 +921,7 @@
         // Step 1: Unified function — computes pool locally, ONE write to start banning
         window.startDraftAction = async () => {
             if (!isAdmin()) return;
+            SoundManager.play('button_click');
             let finalPool = [];
             let rCount = 0, dCount = 0;
             let strategyName = "";
@@ -781,6 +964,7 @@
         window.startOverAction = async () => {
             if (!isAdmin()) return;
             if (!confirm("Reset entire lobby? All participants will be moved to unassigned.")) return;
+            SoundManager.play('button_click');
             await transactionalUpdateRoom((data) => {
                 const playersObj = { ...data.players };
                 Object.keys(playersObj).forEach(uid => {
@@ -794,6 +978,7 @@
 
         window.cancelSetupAction = async () => {
             if (!isAdmin()) return;
+            SoundManager.play('button_click');
             updateRoom({ stage: 'lobby' }, true);
         };
 
@@ -816,6 +1001,7 @@
 
         window.startDraftSetup = async () => {
             if (!isAdmin()) return;
+            SoundManager.play('button_click');
             const playersArr = Object.values(roomData.players || {});
             const rCount = playersArr.filter(p => p.team === 'Radiant').length;
             const dCount = playersArr.filter(p => p.team === 'Dire').length;
@@ -827,11 +1013,19 @@
             updateRoom({ stage: 'setup', excludedIds: [17, 42, 60], setupPositions: {} }, true);
         };
 
-        window.confirmPickAction = async () => {
+        window.confirmPickAction = async (automated = false) => {
             if (_actionLock) return;
             const hId = roomData.pendingHeroId; 
             if (!hId) return;
+            
+            const turnP = getCurrentPickPlayer();
+            const isForMe = turnP?.uid === localUser.uid;
+            
             _actionLock = true;
+            if (!automated && isForMe) {
+                SoundManager.play('hero_picked');
+                _lastPickWasManual = true;
+            }
             try {
                 let success = false;
                 let curTeam = roomData.currentTurnTeam;
@@ -861,9 +1055,17 @@
             } finally { _actionLock = false; }
         };
 
-        window.randomPickAction = async () => {
+        window.randomPickAction = async (automated = false) => {
             if (_actionLock) return;
+            
+            const turnP = getCurrentPickPlayer();
+            const isForMe = turnP?.uid === localUser.uid;
+            
             _actionLock = true;
+            if (!automated && isForMe) {
+                SoundManager.play('hero_picked');
+                _lastPickWasManual = true;
+            }
             try {
                 let success = false;
                 let pickedId = null;
@@ -898,6 +1100,8 @@
         };
 
         window.handleHeroClick = async (heroId) => {
+            SoundManager.unlock();
+            SoundManager.play('button_click');
             if (roomData.stage === 'formation') return;
             const playersArr = Object.values(roomData.players || {});
             if (roomData.stage === 'banning') {
@@ -1261,11 +1465,31 @@
             }
         };
 
-        const render = () => {
-            const container = document.getElementById('main-content'), roomDisp = document.getElementById('room-display'), ctrls = document.getElementById('header-controls');
-            roomDisp.textContent = roomData.id ? `ROOM: ${roomData.id} • ${roomData.stage.toUpperCase()}` : 'DOTA DRAFTER';
-            ctrls.innerHTML = localUser.uid ? `<div class="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-2xl border border-white/5"><img src="${localUser.photo}" class="w-6 h-6 rounded border border-white/10"><span class="text-[10px] font-black uppercase hidden sm:block">${localUser.name}</span><button onclick="logoutAction()" class="text-slate-500 hover:text-white"><i data-lucide="log-out" class="w-4 h-4"></i></button></div>` : '';
+        const renderHeader = () => {
+            const roomDisp = document.getElementById('room-display'), ctrls = document.getElementById('header-controls');
+            if (roomDisp) roomDisp.textContent = roomData.id ? `ROOM: ${roomData.id} • ${roomData.stage.toUpperCase()}` : 'DOTA DRAFTER';
+            
+            const sfxIcon = SoundManager.isMuted ? 'volume-x' : 'volume-2';
+            const sfxBtn = `<button onclick="SoundManager.toggleMute()" class="text-slate-500 hover:text-white transition-all flex items-center justify-center p-2" title="Toggle SFX"><i data-lucide="${sfxIcon}" class="w-4 h-4"></i></button>`;
+            
+            const controlsHtml = `
+                <div class="flex items-center gap-1 bg-white/5 py-1 px-2 rounded-2xl border border-white/5">
+                    ${sfxBtn}
+                    ${localUser.uid ? `
+                        <div class="w-px h-4 bg-white/10 mx-1"></div>
+                        <img src="${localUser.photo}" class="w-6 h-6 rounded border border-white/10">
+                        <span class="text-[10px] font-black uppercase hidden sm:block">${localUser.name}</span>
+                        <button onclick="logoutAction()" class="text-slate-500 hover:text-white p-2"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+                    ` : ''}
+                </div>`;
+            
+            if (ctrls) ctrls.innerHTML = controlsHtml;
             lucide.createIcons();
+        };
+
+        const render = () => {
+            const container = document.getElementById('main-content');
+            renderHeader();
             if (!roomData.id || roomData.stage === 'entry') { renderEntry(container); return; }
             switch (roomData.stage) {
                 case 'lobby': renderLobby(container); break;
@@ -1319,7 +1543,7 @@
                 } else if (roomData.stage === 'picking') {
                     const turnP = getCurrentPickPlayer();
                     if (turnP?.uid.startsWith('bot')) {
-                        botActionTimeout = setTimeout(() => { randomPickAction(); botActionTimeout = null; }, 2500);
+                        botActionTimeout = setTimeout(() => { randomPickAction(true); botActionTimeout = null; }, 2500);
                     }
                 }
             }
@@ -1357,6 +1581,18 @@
             }
 
             const leftSec = Math.ceil(rawLeft / 1000);
+            
+            // Timer SFX thresholds
+            if (leftSec === 10 && lastAudioState.timerThreshold !== 10) {
+                SoundManager.play('count_pick_10');
+                lastAudioState.timerThreshold = 10;
+            } else if (leftSec === 5 && lastAudioState.timerThreshold !== 5) {
+                SoundManager.play('count_pick_5');
+                lastAudioState.timerThreshold = 5;
+            } else if (leftSec > 10) {
+                lastAudioState.timerThreshold = 0;
+            }
+
             if (document.getElementById('turn-timer-text')) document.getElementById('turn-timer-text').innerText = leftSec;
             const progress = document.getElementById('timer-progress');
             if (progress) {
@@ -1367,7 +1603,7 @@
             if (leftSec <= 0 && isAdmin() && !_finalizingTurn && !_actionLock) {
                 if (roomData.isExtraTime) {
                     if (roomData.stage === 'picking') {
-                        if (roomData.pendingHeroId) confirmPickAction(); else randomPickAction();
+                        if (roomData.pendingHeroId) confirmPickAction(true); else randomPickAction(true);
                     } else finalizeTurn();
                 } else {
                     if (roomData.stage === 'banning') finalizeTurn();
@@ -1427,6 +1663,7 @@
                             }
                         }
                         roomData = data;
+                        checkSoundTriggers();
                         render();
                     }
                 });
