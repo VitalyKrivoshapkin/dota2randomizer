@@ -855,7 +855,7 @@
             if (roomData.stage === 'banning') {
                 const myT = playersArr.find(p => p.uid === localUser.uid)?.team;
                 if (myT !== roomData.currentTurnTeam) return;
-                await updateRoom({ [`votes.${localUser.uid}`]: heroId }); // safe debounced dot-notation update
+                await updateRoom({ [`votes.${localUser.uid}`]: heroId }, true); // Force immediate sync for votes to prevent race with finalizeTurn
             } else if (roomData.stage === 'picking') {
                 const turnP = getCurrentPickPlayer();
                 const bansArr = Object.values(roomData.bans || {});
