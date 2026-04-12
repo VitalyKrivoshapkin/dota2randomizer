@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dota 2 Drafter Counter-Pick Mode</title>
+    <meta name="description" content="Counter-Pick ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --radiant: #22c55e;
+            --dire: #ef4444;
+            --gold: #f59e0b;
+            --bg: #080a0f;
+            --surface: #0f1219;
+            --surface2: #161b25;
+            --border: rgba(255, 255, 255, 0.07);
+            --text: #f1f5f9;
+            --muted: #64748b;
+            --str: #ef4444;
+            --agi: #22c55e;
+            --int: #3b82f6;
+            --uni: #a855f7;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ─── HEADER ─── */
+        #app-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(8, 10, 15, 0.9);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stage-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .stage-badge.selection {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .stage-badge.ordering {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--gold);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .stage-badge.draft {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--dire);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+
+        .stage-badge.result {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--radiant);
+            border: 1px solid rgba(34, 197, 94, 0.25);
+        }
+
+        .header-room {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        /* ─── LAYOUT ─── */
+        #main {
+            display: flex;
+            min-height: calc(100vh - 57px);
+        }
+
+        #sidebar {
+            width: 220px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        #content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            #sidebar {
+                display: none;
+            }
+        }
+
+        /* ─── SIDEBAR ─── */
+        .sidebar-team {
+            margin-bottom: 20px;
+        }
+
+        .sidebar-team-name {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-team-name.radiant {
+            color: var(--radiant);
+        }
+
+        .sidebar-team-name.dire {
+            color: var(--dire);
+        }
+
+        .sidebar-player {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .sidebar-player.current-picker {
+            border-color: var(--gold);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .sidebar-player img {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .sidebar-player-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar-player-name {
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-player-status {
+            font-size: 9px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .status-confirmed {
+            color: var(--radiant) !important;
+        }
+
+        .status-picking {
+            color: var(--gold) !important;
+        }
+
+        /* ─── FILTERS ─── */
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-btn:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            color: var(--text);
+        }
+
+        .filter-btn.active.str {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--str);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .filter-btn.active.agi {
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--agi);
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .filter-btn.active.int {
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--int);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .filter-btn.active.uni {
+            background: rgba(168, 85, 247, 0.12);
+            color: var(--uni);
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .filter-btn.active.cx {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--gold);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .filter-sep {
+            width: 1px;
+            height: 28px;
+            background: var(--border);
+            align-self: center;
+        }
+
+        /* HERO GRID*/
+        .hero-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 6px;
+        }
+
+        @media (max-width: 1400px) {
+            .hero-grid {
+                grid-template-columns: repeat(10, 1fr);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .hero-grid {
+                grid-template-columns: repeat(8, 1fr);
+            }
+        }
+
+        @media (max-width: 800px) {
+            .hero-grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+
+        .hero-card {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.15s;
+            aspect-ratio: 12/16;
+            background: var(--surface2);
+        }
+
+        .hero-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.2s;
+            pointer-events: none;
+        }
+
+        .hero-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.04);
+        }
+
+        .hero-card:hover img {
+            transform: scale(1.06);
+        }
+
+        .hero-card.selected {
+            border-color: var(--gold);
+        }
+
+        .hero-card.selected img {
+            filter: brightness(1.1);
+        }
+
+        .hero-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+            padding: 12px 4px 3px;
+            font-size: 7px;
+            font-weight: 800;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.3px;
+            line-height: 1.2;
+        }
+
+        .hero-attr-dot {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .hero-attr-dot.str {
+            background: var(--str);
+        }
+
+        .hero-attr-dot.agi {
+            background: var(--agi);
+        }
+
+        .hero-attr-dot.int {
+            background: var(--int);
+        }
+
+        .hero-attr-dot.uni {
+            background: var(--uni);
+        }
+
+        .hero-cx {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            font-size: 6px;
+            opacity: 0.7;
+        }
+
+        .hero-star-btn {
+            position: absolute;
+            top: 12px;
+            right: -2px;
+            font-size: 16px;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 5;
+            text-shadow: 0 0 4px black;
+        }
+
+        .hero-card:hover .hero-star-btn,
+        .hero-card.selected .hero-star-btn {
+            opacity: 1;
+        }
+
+        .hero-card.starred .hero-star-btn {
+            opacity: 1;
+        }
+
+        .hero-card.starred {
+            border-color: #facc15;
+        }
+
+        .hero-selected-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(245, 158, 11, 0.15);
+            pointer-events: none;
+        }
+
+        .hero-card.hidden-card {
+            display: none;
+        }
+
+        /* CONFIRM BAR */
+        .confirm-bar {
+            position: sticky;
+            bottom: 0;
+            background: rgba(8, 10, 15, 0.95);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            z-index: 1000;
+        }
+
+        .confirm-count {
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .confirm-count span {
+            color: var(--gold);
+        }
+
+        .confirm-count span {
+            color: var(--gold);
+        }
+
+        .btn-confirm {
+            padding: 0 24px;
+            height: 44px;
+            min-width: 180px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 12px;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .btn-confirm.ready {
+            background: var(--gold);
+            color: #000;
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-confirm.ready:hover {
+            background: #fbbf24;
+            transform: translateY(-1px);
+        }
+
+        .btn-confirm.not-ready {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            cursor: not-allowed;
+            border: 1px solid var(--border);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .btn-confirm.confirmed {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--radiant);
+            border: 2px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .btn-confirm.confirmed:hover {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.5);
+        }
+
+        .btn-start-draft {
+            padding: 10px 24px;
+            border-radius: 12px;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            background: var(--radiant);
+            color: #000;
+            transition: all 0.2s;
+        }
+
+        .btn-start-draft:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* ORDERING STAGE */
+        .ordering-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 600px) {
+            .ordering-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .order-team-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .order-team-title {
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 14px;
+        }
+
+        .order-player-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            margin-bottom: 8px;
+            cursor: grab;
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .order-player-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .order-player-item.dragging {
+            opacity: 0.4;
+        }
+
+        .order-player-item.drag-over {
+            border-color: var(--gold);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .order-num {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .order-player-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 24px 0;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .option-card {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .option-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .option-card.selected {
+            border-color: var(--gold);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .option-card-title {
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .option-card-desc {
+            font-size: 10px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        /* DRAFT STAGE */
+        .draft-teams-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .draft-team-panel {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .draft-team-panel.active-team.radiant {
+            border-color: var(--radiant);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
+        }
+
+        .draft-team-panel.active-team.dire {
+            border-color: var(--dire);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
+        }
+
+        .draft-team-name {
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .draft-pick-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .draft-pick-slot {
+            width: 48px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            aspect-ratio: 12/16;
+            position: relative;
+        }
+
+        .draft-pick-slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .draft-pick-slot .slot-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            font-size: 6px;
+            font-weight: 800;
+            text-align: center;
+            padding: 2px;
+            background: rgba(0, 0, 0, 0.8);
+            text-transform: uppercase;
+        }
+
+        .draft-pick-slot.filled {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Slot Machine */
+        .slot-machine-wrap {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        .current-picker-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .current-picker-info img {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: 2px solid var(--gold);
+        }
+
+        .current-picker-name {
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .current-picker-sub {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .slot-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.08);
+            background: var(--surface);
+            height: 100px;
+        }
+
+        .slot-track {
+            display: flex;
+            gap: 6px;
+            padding: 6px;
+            will-change: transform;
+            transition: none;
+        }
+
+        .slot-card {
+            width: 78px;
+            height: 88px;
+            flex-shrink: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+        }
+
+        .slot-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .slot-arrow {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 14px solid var(--gold);
+            z-index: 10;
+        }
+
+        .slot-center-highlight {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            border: 2px solid var(--gold);
+            border-radius: 10px;
+            pointer-events: none;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+            z-index: 5;
+        }
+
+        .slot-edge-fade-left {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 80px;
+            background: linear-gradient(to right, var(--surface), transparent);
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .slot-edge-fade-right {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            width: 80px;
+            background: linear-gradient(to left, var(--surface), transparent);
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .roll-status {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 10px;
+            font-weight: 600;
+            min-height: 20px;
+        }
+
+        /* Counter mode info strip */
+        .counter-mode-strip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--dire);
+            margin: 0 auto 16px;
+        }
+
+        /* RESULT STAGE */
+        .result-layout {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .result-teams {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 600px) {
+            .result-teams {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-team-col h3 {
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+        }
+
+        .result-player-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 10px;
+            animation: resultReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes resultReveal {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-player-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .result-hero-img {
+            width: 64px;
+            height: 86px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .result-hero-name {
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .result-player-name {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .btn-reset {
+            padding: 12px 32px;
+            background: var(--dire);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-reset:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        /* UTILS */
+        .section-title {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--muted);
+            margin-bottom: 16px;
+        }
+
+        .big-title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 1000;
+        }
+
+        #loading-overlay p {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            z-index: 999;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* BOTS */
+        .bot-badge {
+            display: inline-block;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.25);
+            padding: 1px 5px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+
+        .btn-add-bot {
+            width: 100%;
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px dashed rgba(168, 85, 247, 0.3);
+            background: rgba(168, 85, 247, 0.04);
+            color: #a855f7;
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .btn-add-bot:hover {
+            background: rgba(168, 85, 247, 0.1);
+            border-color: rgba(168, 85, 247, 0.5);
+        }
+
+        .btn-remove-bot {
+            background: none;
+            border: none;
+            color: rgba(239, 68, 68, 0.5);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px 4px;
+            transition: color 0.15s;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        .btn-remove-bot:hover {
+            color: var(--dire);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner" style="width:40px;height:40px;border-width:4px;"></div>
+        <p>Loading Counter-Pick...</p>
+    </div>
+
+    <!-- HEADER -->
+    <div id="app-header">
+        <div class="header-logo">⚔️ <span>Counter-Pick</span></div>
+        <div id="stage-badge-el" class="stage-badge selection">Selection</div>
+        <a href="./index.html"
+            style="font-size:11px;color:var(--muted);font-weight:700;text-decoration:none;margin-left:8px;">← Back to
+            Portal</a>
+        <div class="header-room" id="header-room"></div>
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div id="main">
+        <div id="sidebar">
+            <div id="sidebar-radiant" class="sidebar-team">
+                <div class="sidebar-team-name radiant">🟢 Radiant</div>
+                <div id="sidebar-radiant-players"></div>
+            </div>
+            <div id="sidebar-dire" class="sidebar-team">
+                <div class="sidebar-team-name dire">🔴 Dire</div>
+                <div id="sidebar-dire-players"></div>
+            </div>
+        </div>
+        <div id="content"><!-- rendered by JS --></div>
+    </div>
+
+    <div id="confirm-bar" class="confirm-bar" style="display:none;"></div>
+    <div id="toast"></div>
+
+    <!-- BOT SIDEBAR HOST CONTROLS (below teams) -->
+
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert("CORS Error Detected!\n\nModern browsers block local script modules when opened via double-click (file://).\n\nPlease run this project through a local server (like VS Code Live Server or 'npx serve').");
+        }
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, onSnapshot, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { HEROES, heroTagTooltipLines, getCounterHeroIdsFromTags } from "./heroes-data.js";
+        import { 
+            isRoomStale, 
+            genAvatar, 
+            hostPresenceMs, 
+            DB_APP_ID, 
+            HOST_STALE_MS, 
+            roomDocRef,
+            initPortalApp
+        } from "./index-portal-core.js";
+
+
+
+        const buildFreshCounterPickRoom = (code, user) => ({
+            id: code, stage: 'lobby', gameMode: 'counterpick', hostUid: user.uid, hostLastEnteredAt: Date.now(),
+            players: {
+                [user.uid]: { uid: user.uid, name: user.name, photo: user.photo, team: 'unassigned', slot: -1 },
+            },
+            nValues: [5, 5, 5, 5, 5], pool: [], bans: {}, picksRadiant: {}, picksDire: {},
+            teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
+            strategyIdx: 0, timerStart: 0, isExtraTime: false, accelTimerStart: 0, votes: {},
+            currentTurnTeam: 'Radiant', pendingHeroId: null,
+            pickDuration: 45, infinitePickTime: false, banDuration: 45, infiniteBanTime: false,
+            randomPickIds: {}, excludedIds: [66, 91, 82], setupPositions: {},
+            cpStage: 'selection', cpSelections: {}, cpOrderRadiant: [], cpOrderDire: [],
+            cpDraftMode: 'professional', cpRandomMode: 'full', cpFinalPicks: {},
+            cpCurrentPickerUid: null, cpCurrentSeqIdx: 0, cpDraftSequence: [],
+        });
+
+        const { app, db, auth } = initPortalApp({ enableAnalytics: false });
+
+        const CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/";
+        const heroImg = (h) => (h ? `${CDN}${h.imgName}.png?` : "");
+        const heroById = (id) => HEROES.find((h) => h.id === id);
+
+        function escHeroTip(s) {
+            return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+        }
+        function heroHoverTitle(h) {
+            return escHeroTip(heroTagTooltipLines(h).join("\n"));
+        }
+
+        /* ——————————————————————————————————————————————
+           STATE
+        —————————————————————————————————————————————— */
+        let localUser = { uid: '', name: '', photo: '' };
+        let roomCode = '';
+        let roomData = {};
+        let unsubRoom = null;
+
+        // Local selection state (not in Firestore during editing)
+        let mySelectedIds = [];
+        let myStarredIds = [];
+        let myConfirmed = false;
+
+        // Filters
+        let filterAttr = null;   // null = all
+        let filterCx = null;   // null = all
+
+        // Ordering drag state
+        let dragSrcIdx = null;
+        let dragSrcTeam = null;
+
+        // Draft animation
+        let isRolling = false;
+
+        /* ——————————————————————————————————————————————
+           HELPERS
+        —————————————————————————————————————————————— */
+        const buildDraftSequence = (rOrder, dOrder, mode) => {
+            const seq = [];
+            if (mode === 'classic') {
+                const max = Math.max(rOrder.length, dOrder.length);
+                for (let i = 0; i < max; i++) {
+                    if (rOrder[i]) seq.push({ uid: rOrder[i], team: 'Radiant' });
+                    if (dOrder[i]) seq.push({ uid: dOrder[i], team: 'Dire' });
+                }
+            } else {
+                // Professional: 1-2-2-2-1 style
+                const steps = [
+                    { t: 'Radiant', c: 1 }, { t: 'Dire', c: 2 },
+                    { t: 'Radiant', c: 2 }, { t: 'Dire', c: 2 },
+                    { t: 'Radiant', c: 2 }, { t: 'Dire', c: 1 }
+                ];
+                let rIdx = 0, dIdx = 0;
+                steps.forEach(s => {
+                    for (let i = 0; i < s.c; i++) {
+                        if (s.t === 'Radiant' && rOrder[rIdx]) seq.push({ uid: rOrder[rIdx++], team: 'Radiant' });
+                        if (s.t === 'Dire' && dOrder[dIdx]) seq.push({ uid: dOrder[dIdx++], team: 'Dire' });
+                    }
+                });
+            }
+            return seq;
+        };
+
+        const toast = (msg, dur = 3000) => {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), dur);
+        };
+
+        const isHost = () => roomData.hostUid === localUser.uid;
+
+        const getPlayers = () => Object.values(roomData.players || {});
+        const radiantPlayers = () => getPlayers().filter(p => p.team === 'Radiant').sort((a, b) => a.slot - b.slot);
+        const direPlayers = () => getPlayers().filter(p => p.team === 'Dire').sort((a, b) => a.slot - b.slot);
+
+        const isBot = (uid) => uid && uid.startsWith('bot_');
+
+        const updateRoom = async (data) => {
+            const ref = roomDocRef(db, roomCode);
+            await updateDoc(ref, data);
+        };
+
+        /* ——————————————————————————————————————————————
+           BOT MANAGEMENT
+        —————————————————————————————————————————————— */
+        window.addBot = async () => {
+            if (!isHost()) return;
+            const botId = 'bot_' + Math.random().toString(36).substr(2, 8);
+            const botNum = Math.floor(Math.random() * 99) + 1;
+            const botUser = {
+                uid: botId, name: `Bot ${botNum}`,
+                photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`,
+                team: 'unassigned', slot: -1
+            };
+            await updateRoom({ [`players.${botId}`]: botUser });
+        };
+
+        window.removeBot = async (botUid) => {
+            if (!isHost()) return;
+            // Remove from players + clean up their selection
+            const ref = roomDocRef(db, roomCode);
+            await updateDoc(ref, {
+                [`players.${botUid}`]: deleteField(),
+                [`cpSelections.${botUid}`]: deleteField()
+            });
+        };
+
+        window.assignBotToTeam = async (botUid) => {
+            if (!isHost()) return;
+            const players = Object.values(roomData.players || {});
+            // Find a free slot
+            let freeSlot = null;
+            for (const team of ['Radiant', 'Dire']) {
+                for (let slot = 0; slot < 5; slot++) {
+                    if (!players.find(p => p.team === team && p.slot === slot)) {
+                        freeSlot = { team, slot };
+                        break;
+                    }
+                }
+                if (freeSlot) break;
+            }
+            if (!freeSlot) { toast('⚠️ No free slots available'); return; }
+            await updateRoom({
+                [`players.${botUid}.team`]: freeSlot.team,
+                [`players.${botUid}.slot`]: freeSlot.slot
+            });
+        };
+
+        // Build a random pool for a bot (3-6 heroes, some starred)
+        const buildBotPool = () => {
+            const shuffled = [...HEROES].sort(() => Math.random() - 0.5);
+            const count = 3 + Math.floor(Math.random() * 4); // 3-6
+            const heroIds = shuffled.slice(0, count).map(h => h.id);
+            // Star 1-2 random heroes
+            const starCount = Math.min(Math.floor(Math.random() * 2) + 1, heroIds.length);
+            const starredIds = [...heroIds].sort(() => Math.random() - 0.5).slice(0, starCount);
+            return { heroIds, starredIds };
+        };
+
+        let _botActionRunning = false;
+
+        // Called after each render — host runs bot actions automatically
+        const runBotActions = async () => {
+            if (!isHost() || _botActionRunning) return;
+            const stage = roomData.cpStage || 'selection';
+            const bots = getPlayers().filter(p => isBot(p.uid) && p.team !== 'unassigned');
+            if (!bots.length) return;
+
+            _botActionRunning = true;
+            try {
+                if (stage === 'selection') {
+                    await runBotSelection(bots);
+                } else if (stage === 'draft') {
+                    await runBotDraft();
+                }
+            } finally {
+                _botActionRunning = false;
+            }
+        };
+
+        const runBotSelection = async (bots) => {
+            const sel = roomData.cpSelections || {};
+            const unconfirmedBots = bots.filter(b => !(sel[b.uid] || {}).confirmed);
+            if (!unconfirmedBots.length) return;
+
+            // Batch all unconfirmed bots securely into a single write
+            await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000));
+            const batchUpdates = {};
+            for (const bot of unconfirmedBots) {
+                batchUpdates[`cpSelections.${bot.uid}`] = { ...buildBotPool(), confirmed: true };
+            }
+
+            try {
+                await updateRoom(batchUpdates);
+            } catch (e) { }
+        };
+
+        const runBotDraft = async () => {
+            const currentPickerUid = roomData.cpCurrentPickerUid;
+            if (!currentPickerUid || !isBot(currentPickerUid)) return;
+            if (isRolling) return;
+            // Bots roll automatically — trigger the same startRoll logic
+            // Delay for 1-2s to feel natural
+            setTimeout(() => startRoll(currentPickerUid, true), 1000 + Math.random() * 1000);
+        };
+
+        /* ——————————————————————————————————————————————
+           SIDEBAR
+        —————————————————————————————————————————————— */
+        const renderSidebar = () => {
+            const stage = roomData.cpStage || 'selection';
+            const sel = roomData.cpSelections || {};
+            const currentPicker = roomData.cpCurrentPickerUid;
+            const finalPicks = roomData.cpFinalPicks || {};
+
+            const renderList = (players, containerId) => {
+                const el = document.getElementById(containerId);
+                if (!el) return;
+                el.innerHTML = players.map(p => {
+                    const pSel = sel[p.uid] || {};
+                    const confirmed = pSel.confirmed;
+                    const count = (pSel.heroIds || []).length;
+                    const isPicker = p.uid === currentPicker;
+                    const pickedHeroId = finalPicks[p.uid];
+                    const pickedHero = pickedHeroId ? heroById(pickedHeroId) : null;
+                    const bot = isBot(p.uid);
+                    return `<div class="sidebar-player ${isPicker ? 'current-picker' : ''} ${bot ? 'bot-player' : ''}">
+                <img src="${p.photo || genAvatar(p.uid)}" alt="">
+                <div class="sidebar-player-info">
+                    <div class="sidebar-player-name">
+                        ${p.name}${p.uid === localUser.uid ? ' (You)' : ''}
+                        ${bot ? '<span class="bot-badge">BOT</span>' : ''}
+                    </div>
+                    <div class="sidebar-player-status ${confirmed ? 'status-confirmed' : (isPicker ? 'status-picking' : '')}">
+                        ${stage === 'result' && pickedHero ? `⚔️ ${pickedHero.name}` :
+                            stage === 'selection' ? (confirmed ? `✅ ${count} heroes` : (count > 0 ? `⏳ ${count} heroes` : '⏳ Choosing')) :
+                                stage === 'ordering' ? (confirmed ? '✅ Ready' : '⏳') :
+                                    stage === 'draft' && isPicker ? '🎲 Rolling...' : ''}
+                    </div>
+                </div>
+                ${bot && isHost() && stage === 'selection' ? `<button class="btn-remove-bot" onclick="removeBot('${p.uid}')" title="Remove Bot">✖</button>` : ''}
+            </div>`;
+                }).join('');
+            };
+            renderList(radiantPlayers(), 'sidebar-radiant-players');
+            renderList(direPlayers(), 'sidebar-dire-players');
+
+            // Bot controls: unassigned bots + Add Bot button (host only, selection stage)
+            const botControls = document.getElementById('sidebar-bot-controls');
+            if (botControls) {
+                if (isHost() && stage === 'selection') {
+                    const unassignedBots = getPlayers().filter(p => isBot(p.uid) && p.team === 'unassigned');
+                    botControls.innerHTML = `
+                ${unassignedBots.map(b => `
+                    <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.15);border-radius:8px;margin-bottom:6px;">
+                        <img src="${b.photo}" style="width:22px;height:22px;border-radius:50%;">
+                        <span style="font-size:10px;font-weight:700;flex:1;">${b.name}</span>
+                        <button onclick="assignBotToTeam('${b.uid}')" style="font-size:9px;font-weight:800;background:rgba(168,85,247,0.1);color:#a855f7;border:1px solid rgba(168,85,247,0.2);border-radius:4px;padding:2px 6px;cursor:pointer;">+ Add</button>
+                        <button class="btn-remove-bot" onclick="removeBot('${b.uid}')">✖</button>
+                    </div>
+                `).join('')}
+                <button class="btn-add-bot" onclick="addBot()">+ Add Bot</button>
+            `;
+                    botControls.style.display = 'block';
+                } else {
+                    botControls.style.display = 'none';
+                }
+            }
+        };
+
+        /* ——————————————————————————————————————————————
+           STAGE BADGE
+        —————————————————————————————————————————————— */
+        const STAGE_LABELS = { selection: '1. Pool Selection', ordering: '2. Strategy', draft: '3. Draft', result: '4. Results' };
+        const updateStageBadge = () => {
+            const el = document.getElementById('stage-badge-el');
+            const s = roomData.cpStage || 'selection';
+            el.className = `stage-badge ${s}`;
+            el.textContent = STAGE_LABELS[s] || s;
+        };
+
+        /* ——————————————————————————————————————————————
+           STAGE 1: SELECTION
+        —————————————————————————————————————————————— */
+        const renderSelection = () => {
+            const content = document.getElementById('content');
+            if (!document.getElementById('hero-grid')) {
+                content.innerHTML = `
+            <div class="section-title">Select at least 3 heroes for your pool</div>
+            <div class="filters" id="filters-bar">
+                <button class="filter-btn str" id="fb-str" onclick="toggleAttrFilter('str')">💪 Strength</button>
+                <button class="filter-btn agi" id="fb-agi" onclick="toggleAttrFilter('agi')"> Agility</button>
+                <button class="filter-btn int" id="fb-int" onclick="toggleAttrFilter('int')">🧠 Intelligence</button>
+                <button class="filter-btn uni" id="fb-uni" onclick="toggleAttrFilter('uni')">⚡ Universal</button>
+                <div class="filter-sep"></div>
+                <button class="filter-btn cx" id="fb-c1" onclick="toggleCxFilter(1)">● Easy</button>
+                <button class="filter-btn cx" id="fb-c2" onclick="toggleCxFilter(2)">●● Medium</button>
+                <button class="filter-btn cx" id="fb-c3" onclick="toggleCxFilter(3)">●●● Hard</button>
+            </div>
+            <div class="hero-grid" id="hero-grid"></div>
+        `;
+            }
+
+            // Update filter buttons gracefully
+            document.getElementById('fb-str').className = `filter-btn str ${filterAttr === 'str' ? 'active' : ''}`;
+            document.getElementById('fb-agi').className = `filter-btn agi ${filterAttr === 'agi' ? 'active' : ''}`;
+            document.getElementById('fb-int').className = `filter-btn int ${filterAttr === 'int' ? 'active' : ''}`;
+            document.getElementById('fb-uni').className = `filter-btn uni ${filterAttr === 'uni' ? 'active' : ''}`;
+            document.getElementById('fb-c1').className = `filter-btn cx ${filterCx === 1 ? 'active' : ''}`;
+            document.getElementById('fb-c2').className = `filter-btn cx ${filterCx === 2 ? 'active' : ''}`;
+            document.getElementById('fb-c3').className = `filter-btn cx ${filterCx === 3 ? 'active' : ''}`;
+
+            renderHeroGrid();
+            renderConfirmBar();
+        };
+
+        const renderHeroGrid = () => {
+            const grid = document.getElementById('hero-grid');
+            if (!grid) return;
+
+            if (grid.children.length === 0) {
+                // Initial build - prevents hover DOM destruction flickering
+                grid.innerHTML = HEROES.map(h => `
+            <div class="hero-card" id="hc-${h.id}" title="${heroHoverTitle(h)}">
+                <img src="${heroImg(h)}" alt="${h.name}" loading="lazy" onerror="this.style.opacity=0.2">
+                <div class="hero-attr-dot ${h.attr}"></div>
+                <div class="hero-cx">${'●'.repeat(h.cx)}</div>
+                
+                <div class="hero-star-wrapper" id="star-wrap-${h.id}">
+                    <div class="hero-star-btn" onclick="event.stopPropagation();toggleStar(${h.id})" id="star-btn-${h.id}">☆</div>
+                </div>
+                <div id="star-locked-${h.id}" style="position:absolute;top:16px;right:6px;font-size:16px;filter:drop-shadow(0 0 3px black);z-index:5;display:none;"></div>
+                
+                <div class="hero-selected-overlay" id="hc-overlay-${h.id}" style="display:none;"></div>
+                <div class="hero-name">${h.name}</div>
+            </div>
+        `).join('');
+            }
+
+            const locked = myConfirmed;
+            HEROES.forEach(h => {
+                const card = document.getElementById(`hc-${h.id}`);
+                if (!card) return;
+
+                const selected = mySelectedIds.includes(h.id);
+                const starred = myStarredIds.includes(h.id);
+                const hidden = (filterAttr && h.attr !== filterAttr) || (filterCx && h.cx !== filterCx);
+
+                // Update classes robustly
+                card.classList.toggle('selected', selected);
+                card.classList.toggle('starred', starred);
+                card.classList.toggle('hidden-card', hidden);
+
+                // Update handlers & cursor without blowing away inner HTML
+                card.style.cursor = locked ? 'default' : 'pointer';
+                card.onclick = locked ? null : () => toggleHero(h.id);
+
+                // Manage dynamic elements safely
+                const wrapper = document.getElementById(`star-wrap-${h.id}`);
+                const btn = document.getElementById(`star-btn-${h.id}`);
+                const lockedIcon = document.getElementById(`star-locked-${h.id}`);
+                const overlay = document.getElementById(`hc-overlay-${h.id}`);
+
+                if (wrapper) wrapper.style.display = locked ? 'none' : 'block';
+                if (btn) btn.textContent = starred ? '⭐' : '☆';
+
+                if (lockedIcon) {
+                    lockedIcon.style.display = (locked && starred) ? 'block' : 'none';
+                    lockedIcon.textContent = '⭐';
+                }
+
+                if (overlay) overlay.style.display = selected ? 'block' : 'none';
+            });
+        };
+
+        const renderConfirmBar = () => {
+            const bar = document.getElementById('confirm-bar');
+            if (!bar) return;
+
+            const allSel = roomData.cpSelections || {};
+            const allConfirmed = getPlayers().filter(p => p.team !== 'unassigned').every(p => (allSel[p.uid] || {}).confirmed);
+            const canStart = isHost() && allConfirmed && getPlayers().filter(p => p.team !== 'unassigned').length >= 2;
+
+            const selectedHeroesHtml = mySelectedIds.length > 0 ? mySelectedIds.map(id => {
+                const h = heroById(id);
+                if (!h) return '';
+                const starred = myStarredIds.includes(id);
+                const locked = myConfirmed;
+                const tipPick = locked ? heroHoverTitle(h) : `Remove ${h.name} — hover for tags`;
+                return `
+            <div style="position:relative; cursor: ${locked ? 'default' : 'pointer'}; transition: transform 0.2s; width: 48px; height: 48px; flex-shrink: 0; border-radius: 8px; border: 2px solid var(--border); overflow: hidden; opacity: ${locked ? '0.6' : '1'};" 
+                 onclick="${locked ? '' : `toggleHero(${id})`}"
+                 onmouseover="${locked ? '' : `this.style.transform='scale(1.1)'`}" 
+                 onmouseout="this.style.transform='scale(1)'"
+                 title="${escHeroTip(tipPick)}">
+                <img src="${heroImg(h)}" style="width:100%; height:100%; object-fit:cover;">
+                ${starred ? '<div style="position:absolute; top:-2px; right:0px; font-size:10px; z-index:10; filter: drop-shadow(0 0 2px black);">⭐</div>' : ''}
+                ${!locked ? `<div style="position:absolute; inset:0; background:rgba(239,68,68,0.3); opacity:0; transition:opacity 0.2s; display:flex; align-items:center; justify-content:center; color:white; font-size:16px; font-weight:bold;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">✖</div>` : ''}
+            </div>`;
+            }).join('') : `<span style="font-size:11px; color:var(--muted); padding: 10px 0;">No heroes selected yet...</span>`;
+
+            bar.style.display = 'flex';
+            bar.innerHTML = `
+        <div style="flex-basis: 100%; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); min-height: 58px; align-items: center; scrollbar-width: none;">
+            ${selectedHeroesHtml}
+            <style>#confirm-bar > div::-webkit-scrollbar { display: none; }</style>
+        </div>
+        <div style="display:flex; flex:1; align-items:center; gap:16px; flex-wrap:wrap;">
+            <span class="confirm-count">Selected: <span>${mySelectedIds.length}</span> ${mySelectedIds.length < 3 ? '<span style="color:var(--dire);font-size:11px;">  (min. 3)</span>' : ''}</span>
+            <span style="font-size:11px;color:var(--muted);">${myStarredIds.length > 0 ? `⭐ ${myStarredIds.length} starred` : ''}</span>
+            <button class="btn-confirm ${myConfirmed ? 'confirmed' : (mySelectedIds.length >= 3 ? 'ready' : 'not-ready')}"
+                    onclick="confirmPool()" 
+                    ${(!myConfirmed && mySelectedIds.length < 3) ? 'disabled' : ''}>
+                <span>${myConfirmed ? '✅' : ''}</span>
+                <span>${myConfirmed ? 'Confirmed (Edit)' : 'Confirm Selection'}</span>
+            </button>
+            ${canStart ? `<button class="btn-start-draft" onclick="hostStartOrdering()" style="margin-left:auto;">→ Continue</button>` : ''}
+        </div>
+    `;
+        };
+
+        window.toggleAttrFilter = (a) => { filterAttr = filterAttr === a ? null : a; renderSelection(); };
+        window.toggleCxFilter = (c) => { filterCx = filterCx === c ? null : c; renderSelection(); };
+
+        window.toggleHero = (id) => {
+            if (myConfirmed) return;
+            const idx = mySelectedIds.indexOf(id);
+            if (idx >= 0) {
+                mySelectedIds.splice(idx, 1);
+                myStarredIds = myStarredIds.filter(s => s !== id);
+            } else {
+                mySelectedIds.push(id);
+            }
+            renderHeroGrid();
+            renderConfirmBar();
+        };
+
+        window.toggleStar = (id) => {
+            if (myConfirmed) return;
+            if (!mySelectedIds.includes(id)) {
+                mySelectedIds.push(id);
+                myStarredIds.push(id);
+            } else {
+                const idx = myStarredIds.indexOf(id);
+                if (idx >= 0) myStarredIds.splice(idx, 1);
+                else myStarredIds.push(id);
+            }
+            renderHeroGrid();
+            renderConfirmBar();
+        };
+
+        window.confirmPool = async () => {
+            if (mySelectedIds.length < 3) { toast('⚠️ Select at least 3 heroes'); return; }
+            myConfirmed = !myConfirmed;
+            try {
+                await updateRoom({
+                    [`cpSelections.${localUser.uid}`]: {
+                        heroIds: mySelectedIds,
+                        starredIds: myStarredIds,
+                        confirmed: myConfirmed
+                    }
+                });
+            } catch (e) { toast('❌ ' + e.message); }
+            renderSelection();
+        };
+
+        window.hostStartOrdering = async () => {
+            if (!isHost()) return;
+            const allSel = roomData.cpSelections || {};
+            const relevant = getPlayers().filter(p => p.team !== 'unassigned');
+            const allOk = relevant.every(p => (allSel[p.uid] || {}).confirmed);
+            if (!allOk) { toast('Waiting for all players to confirm the pool'); return; }
+            await updateRoom({
+                cpStage: 'ordering',
+                cpOrderRadiant: radiantPlayers().map(p => p.uid),
+                cpOrderDire: direPlayers().map(p => p.uid),
+                cpDraftMode: 'professional',
+                cpRandomMode: 'full'
+            });
+        };
+
+        /* ══════════════════════════════════════════════
+           STAGE 2: ORDERING
+        ══════════════════════════════════════════════ */
+        const renderOrdering = () => {
+            const content = document.getElementById('content');
+            const rOrder = roomData.cpOrderRadiant || radiantPlayers().map(p => p.uid);
+            const dOrder = roomData.cpOrderDire || direPlayers().map(p => p.uid);
+            const players = roomData.players || {};
+            const draftMode = roomData.cpDraftMode || 'professional';
+            const randomMode = roomData.cpRandomMode || 'full';
+
+            const renderOrderList = (order, teamLabel, teamKey) => order.map((uid, i) => {
+                const p = players[uid] || {};
+                return `<div class="order-player-item" data-uid="${uid}" data-team="${teamLabel}" data-idx="${i}"
+                     draggable="${isHost()}"
+                     ondragstart="onDragStart(event,'${teamKey}',${i})"
+                     ondragover="event.preventDefault();onDragOver(event)"
+                     ondrop="onDrop(event,'${teamKey}',${i})"
+                     ondragleave="onDragLeave(event)">
+            <div class="order-num">${i + 1}</div>
+            <img src="${p.photo || genAvatar(uid)}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;">
+            <span class="order-player-name">${p.name || uid}${uid === localUser.uid ? ' (You)' : ''}</span>
+            ${isHost() ? '<span style="color:var(--muted);font-size:14px;margin-left:auto;">Selection in progress</span>' : ''}
+        </div>`;
+            }).join('');
+
+            content.innerHTML = `
+        <div class="big-title">Draft order and settings</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:24px;">${isHost() ? '⚠️ You are the host — drag and drop players to set the pick order.' : 'Waiting for host to set order and mode.'}</p>
+
+        <div class="ordering-layout">
+            <div class="order-team-block">
+                <div class="order-team-title" style="color:var(--radiant);">🟢 Radiant</div>
+                <div id="order-radiant">${renderOrderList(rOrder, '🟢 Radiant', 'Radiant')}</div>
+            </div>
+            <div class="order-team-block">
+                <div class="order-team-title" style="color:var(--dire);">🔴 Dire</div>
+                <div id="order-dire">${renderOrderList(dOrder, '🔴 Dire', 'Dire')}</div>
+            </div>
+        </div>
+
+        <p class="section-title" style="margin-top:32px;">Drafting order mode</p>
+        <div class="options-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="option-card ${draftMode === 'professional' ? 'selected' : ''}" onclick="${isHost() ? "setDraftMode('professional')" : ''}">
+                <div class="option-card-title">Professional</div>
+                <div class="option-card-desc">1-2-2-2-1<br>Pro-match style</div>
+            </div>
+            <div class="option-card ${draftMode === 'classic' ? 'selected' : ''}" onclick="${isHost() ? "setDraftMode('classic')" : ''}">
+                <div class="option-card-title">Classic</div>
+                <div class="option-card-desc">1-1-1-1-1-1-1-1-1-1<br>Alternating one hero each</div>
+            </div>
+        </div>
+
+        <p class="section-title" style="margin-top:24px;">Randomization mode</p>
+        <div class="options-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="option-card ${randomMode === 'full' ? 'selected' : ''}" onclick="${isHost() ? "setRandomMode('full')" : ''}">
+                <div class="option-card-title">Full Random</div>
+                <div class="option-card-desc">Random from personal pool. ⭐ Heroes have a 2x chance.</div>
+            </div>
+            <div class="option-card ${randomMode === 'counter' ? 'selected' : ''}" onclick="${isHost() ? "setRandomMode('counter')" : ''}">
+                <div class="option-card-title">Counter Pick</div>
+                <div class="option-card-desc">Filters your pool to heroes whose tags cover enemy weakness tags. ⭐ Still weights the filtered pool.</div>
+            </div>
+        </div>
+
+        ${isHost() ? `<div style="margin-top:32px;display:flex;justify-content:center;">
+            <button class="btn-start-draft" onclick="hostStartDraft()">Start Draft</button>
+        </div>` : `<p style="text-align:center;color:var(--muted);font-size:12px;margin-top:32px;">Waiting for host...</p>`}
+    `;
+            document.getElementById('confirm-bar').style.display = 'none';
+        };
+
+        window.setDraftMode = async (m) => { if (isHost()) await updateRoom({ cpDraftMode: m }); };
+        window.setRandomMode = async (m) => { if (isHost()) await updateRoom({ cpRandomMode: m }); };
+
+        // Drag & Drop
+        window.onDragStart = (e, team, idx) => { dragSrcIdx = idx; dragSrcTeam = team; e.currentTarget.classList.add('dragging'); };
+        window.onDragOver = (e) => { e.currentTarget.classList.add('drag-over'); };
+        window.onDragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
+        window.onDrop = async (e, team, targetIdx) => {
+            e.currentTarget.classList.remove('drag-over');
+            if (!isHost() || dragSrcTeam !== team || dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+            const key = team === 'Radiant' ? 'cpOrderRadiant' : 'cpOrderDire';
+            const order = [...(roomData[key] || [])];
+            const [moved] = order.splice(dragSrcIdx, 1);
+            order.splice(targetIdx, 0, moved);
+            dragSrcIdx = null; dragSrcTeam = null;
+            await updateRoom({ [key]: order });
+        };
+
+        window.hostStartDraft = async () => {
+            if (!isHost()) return;
+            const rOrder = roomData.cpOrderRadiant || radiantPlayers().map(p => p.uid);
+            const dOrder = roomData.cpOrderDire || direPlayers().map(p => p.uid);
+            const seq = buildDraftSequence(rOrder, dOrder, roomData.cpDraftMode || 'professional');
+            const firstPicker = seq[0]?.uid;
+            if (!firstPicker) { toast('⚠️ No players available'); return; }
+
+            await updateRoom({
+                cpStage: 'draft',
+                cpDraftSequence: seq,
+                cpCurrentPickerUid: firstPicker,
+                cpCurrentSeqIdx: 0
+            });
+        };
+
+        let lastDraftPickerUid = null;
+        const renderDraft = () => {
+            const content = document.getElementById('content');
+            const finalPicks = roomData.cpFinalPicks || {};
+            const rPlayers = radiantPlayers();
+            const dPlayers = direPlayers();
+            const currentPickerUid = roomData.cpCurrentPickerUid;
+            const currentPickerTeam = rPlayers.find(p => p.uid === currentPickerUid) ? 'Radiant' :
+                dPlayers.find(p => p.uid === currentPickerUid) ? 'Dire' : '';
+
+            const renderTeamSlots = (players) => players.map(p => {
+                const hid = finalPicks[p.uid];
+                const h = hid ? heroById(hid) : null;
+                return `<div class="draft-pick-slot ${h ? 'filled' : ''}">
+            ${h ? `<img src="${heroImg(h)}" alt="${h.name}"><div class="slot-name">${h.name}</div>` : ''}
+        </div>`;
+            }).join('');
+
+            // If layout not built, or we just switched to draft stage
+            if (!document.getElementById('slot-machine-wrap')) {
+                content.innerHTML = `
+            <div class="draft-teams-bar" id="draft-teams-bar">
+                <div class="draft-team-panel" id="panel-radiant">
+                    <div class="draft-team-name" style="color:var(--radiant);">🟢 Radiant</div>
+                    <div class="draft-pick-slots" id="slots-radiant"></div>
+                </div>
+                <div class="draft-team-panel" id="panel-dire">
+                    <div class="draft-team-name" style="color:var(--dire);">🔴 Dire</div>
+                    <div class="draft-pick-slots" id="slots-dire"></div>
+                </div>
+            </div>
+
+            <div class="slot-machine-wrap" id="slot-machine-wrap">
+                <div id="current-picker-info" class="current-picker-info"></div>
+                ${roomData.cpRandomMode === 'counter' ? `<div class="counter-mode-strip">⚔️ Counter Pick Mode — pool filtered by tag strengths vs enemy weaknesses (local data).</div>` : ''}
+                <div class="slot-container" id="slot-container">
+                    <div class="slot-arrow"></div>
+                    <div class="slot-center-highlight"></div>
+                    <div class="slot-edge-fade-left"></div>
+                    <div class="slot-edge-fade-right"></div>
+                    <div class="slot-track" id="slot-track"></div>
+                </div>
+                <div class="roll-status" id="roll-status">Waiting...</div>
+            </div>
+        `;
+            }
+
+            // Refresh slots (picked heroes) and active panel state
+            document.getElementById('panel-radiant').className = `draft-team-panel ${currentPickerTeam === 'Radiant' ? 'active-team radiant' : ''}`;
+            document.getElementById('panel-dire').className = `draft-team-panel ${currentPickerTeam === 'Dire' ? 'active-team dire' : ''}`;
+            document.getElementById('slots-radiant').innerHTML = renderTeamSlots(rPlayers);
+            document.getElementById('slots-dire').innerHTML = renderTeamSlots(dPlayers);
+
+            document.getElementById('confirm-bar').style.display = 'none';
+            updateCurrentPickerUI();
+
+            // TURN DETECTION AND AUTO-ROLL
+            const picker = roomData.cpCurrentPickerUid;
+            if (picker && picker !== lastDraftPickerUid) {
+                lastDraftPickerUid = picker;
+
+                // Reset slot UI for the new turn
+                const track = document.getElementById('slot-track');
+                if (track) { track.style.transform = 'translateX(0)'; track.innerHTML = ''; }
+                const status = document.getElementById('roll-status');
+                if (status) status.textContent = 'Preparing roll...';
+
+                // Bots advance Firestore only via host runBotDraft → startRoll(botUid, true).
+                // Do not run a second startRoll here or isRolling blocks the real bot roll.
+                if (isBot(picker)) {
+                    if (status) status.textContent = 'Bot is rolling...';
+                } else if (picker === localUser.uid || isHost()) {
+                    const isMyTurn = picker === localUser.uid;
+                    setTimeout(() => startRoll(picker, isMyTurn), 800);
+                }
+            }
+        };
+        const updateCurrentPickerUI = () => {
+            const el = document.getElementById('current-picker-info');
+            if (!el) return;
+            const uid = roomData.cpCurrentPickerUid;
+            if (!uid) return;
+            const p = (roomData.players || {})[uid] || {};
+            const isMe = uid === localUser.uid;
+            el.innerHTML = `
+        <img src="${p.photo || genAvatar(uid)}" alt="">
+        <div>
+            <div class="current-picker-name">${p.name || '?'}${isMe ? 'YOUR TURN!' : ''}</div>
+            <div class="current-picker-sub">ROLLING HERO...</div>
+        </div>
+    `;
+        };
+
+        const startRoll = async (pickerUid, triggerAnimation) => {
+            if (isRolling) return;
+            isRolling = true;
+
+            const statusEl = document.getElementById('roll-status');
+            if (statusEl) statusEl.textContent = 'Loading data...';
+
+            const sel = roomData.cpSelections || {};
+            const pickerSel = sel[pickerUid] || {};
+            let heroPool = [...(pickerSel.heroIds || [])];
+            let starredIds = [...(pickerSel.starredIds || [])];
+
+            // Critical Fallback: if pool is empty (e.g. bot not initialized), give 8 random heroes
+            if (heroPool.length < 3) {
+                const shuffled = [...HEROES].sort(() => Math.random() - 0.5);
+                heroPool = shuffled.slice(0, 8).map(h => h.id);
+            }
+
+            // If Counter Pick mode — filter by enemy counters
+            if (roomData.cpRandomMode === 'counter') {
+                const pickerTeam = radiantPlayers().find(p => p.uid === pickerUid) ? 'Radiant' : 'Dire';
+                const enemyTeam = pickerTeam === 'Radiant' ? 'Dire' : 'Radiant';
+                const enemyPicked = Object.entries(roomData.cpFinalPicks || {})
+                    .filter(([uid]) => (roomData.players || {})[uid]?.team === enemyTeam)
+                    .map(([, hid]) => hid);
+
+                if (enemyPicked.length > 0) {
+                    if (statusEl) statusEl.textContent = '⚔️ Applying counter-pick logic...';
+                    
+                    // 1. Try strict (counters ALL enemies)
+                    const counterSet = getCounterHeroIdsFromTags(enemyPicked, heroPool);
+                    let filtered = heroPool.filter(id => counterSet.has(id));
+                    
+                    // 2. Fallback: Try softer (counters at least ONE enemy) if strict is too thin
+                    if (filtered.length < 3) {
+                        const softerSet = new Set();
+                        for (const epId of enemyPicked) {
+                            const oneEnemySet = getCounterHeroIdsFromTags([epId], heroPool);
+                            oneEnemySet.forEach(id => softerSet.add(id));
+                        }
+                        const softerList = heroPool.filter(id => softerSet.has(id));
+                        if (softerList.length > filtered.length) filtered = softerList;
+                    }
+
+                    // 3. Final Fallback: use full pool if still < 3
+                    if (filtered.length >= 3) {
+                        heroPool = filtered;
+                    } else {
+                        if (statusEl) statusEl.textContent = '⚠️ Limited counters, using full pool';
+                    }
+                }
+            }
+
+            // Build weighted pool (starred = 2x)
+            const weightedPool = buildWeightedPool(heroPool, starredIds);
+            const winnerHeroId = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+
+            if (!winnerHeroId) {
+                isRolling = false;
+                if (statusEl) statusEl.textContent = '⚠️ Pool empty';
+                return;
+            }
+
+            await animateSlotMachine(heroPool, starredIds, winnerHeroId);
+
+            // Advance to next picker
+            if (triggerAnimation || pickerUid === localUser.uid) {
+                await advanceDraft(pickerUid, winnerHeroId);
+            }
+            isRolling = false;
+        };
+
+        const buildWeightedPool = (poolIds, starredIds) => {
+            const w = [];
+            poolIds.forEach(id => {
+                w.push(id);
+                if (starredIds.includes(id)) w.push(id); // 2x for starred
+            });
+            return w;
+        };
+
+        const animateSlotMachine = async (heroPool, starredIds, winnerHeroId) => {
+            return new Promise(resolve => {
+                const track = document.getElementById('slot-track');
+                if (!track) { resolve(); return; }
+
+                const CARD_W = 84; // px including gap
+                const VISIBLE = 12;
+                const CENTER = 5;
+
+                // Build a long reel: repeat pool ~12 times, place winner at near-end center
+                const buildReel = () => {
+                    const reel = [];
+                    for (let i = 0; i < 12; i++) {
+                        // Shuffle pool for variety
+                        const shuffled = [...heroPool].sort(() => Math.random() - 0.5);
+                        reel.push(...shuffled);
+                    }
+                    // Put winner near the end at CENTER offset from last visible
+                    const winnerPos = reel.length - CENTER;
+                    reel[winnerPos] = winnerHeroId;
+                    return reel;
+                };
+
+                const reel = buildReel();
+                const stopIndex = reel.length - CENTER;
+
+                // Render reel cards
+                track.style.transition = 'none';
+                track.style.transform = 'translateX(0)';
+                track.innerHTML = reel.map(hid => {
+                    const h = heroById(hid);
+                    const isStarred = starredIds.includes(hid);
+                    return `<div class="slot-card" style="${isStarred ? 'border-color:#facc15;' : ''}">
+                ${h ? `<img src="${heroImg(h)}" alt="${h.name}">` : ''}
+            </div>`;
+                }).join('');
+
+                const containerW = document.getElementById('slot-container').offsetWidth;
+                const centerOffset = containerW / 2 - CARD_W / 2;
+                const targetOffset = -(stopIndex * CARD_W - centerOffset);
+
+                // Animation: fast scroll then ease to stop
+                let start = null;
+                const DURATION = 5500;
+
+                const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+                const easeInQuad = (t) => t * t;
+
+                const statusEl = document.getElementById('roll-status');
+
+                const animate = (ts) => {
+                    if (!start) start = ts;
+                    const elapsed = ts - start;
+                    const progress = Math.min(elapsed / DURATION, 1);
+
+                    // Phase 1: fast constant movement for first 60%
+                    // Phase 2: ease-out for last 40%
+                    let pos;
+                    if (progress < 0.6) {
+                        const fastP = progress / 0.6;
+                        const eased = easeInQuad(fastP);
+                        pos = targetOffset * 0.6 * eased;
+                    } else {
+                        const slowP = (progress - 0.6) / 0.4;
+                        const eased = easeOutCubic(slowP);
+                        pos = targetOffset * 0.6 + targetOffset * 0.4 * eased;
+                    }
+
+                    track.style.transform = `translateX(${pos}px)`;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Landed!
+                        track.style.transform = `translateX(${targetOffset}px)`;
+                        // Highlight winner card
+                        const cards = track.querySelectorAll('.slot-card');
+                        if (cards[stopIndex]) {
+                            cards[stopIndex].style.borderColor = 'var(--gold)';
+                            cards[stopIndex].style.boxShadow = '0 0 20px rgba(245,158,11,0.6)';
+                            cards[stopIndex].style.transform = 'scale(1.08)';
+                        }
+                        const winner = heroById(winnerHeroId);
+                        if (statusEl) statusEl.innerHTML = `🎯 <strong style="color:var(--gold);">${winner?.name || '?'}</strong> selected!`;
+                        setTimeout(resolve, 1200);
+                    }
+                };
+                requestAnimationFrame(animate);
+            });
+        };
+
+        const advanceDraft = async (pickerUid, heroId) => {
+            const seq = roomData.cpDraftSequence || [];
+            const curIdx = (roomData.cpCurrentSeqIdx || 0) + 1;
+            const picks = { ...(roomData.cpFinalPicks || {}), [pickerUid]: heroId };
+            const nextPicker = seq[curIdx]?.uid || null;
+
+            if (nextPicker) {
+                await updateRoom({
+                    [`cpFinalPicks.${pickerUid}`]: heroId,
+                    cpCurrentPickerUid: nextPicker,
+                    cpCurrentSeqIdx: curIdx
+                });
+            } else {
+                // Draft complete
+                await updateRoom({
+                    [`cpFinalPicks.${pickerUid}`]: heroId,
+                    cpCurrentPickerUid: null,
+                    cpStage: 'result'
+                });
+            }
+        };
+
+        /*
+           STAGE 4: RESULT
+        */
+        const renderResult = () => {
+            const content = document.getElementById('content');
+            const picks = roomData.cpFinalPicks || {};
+            const rPlayers = radiantPlayers();
+            const dPlayers = direPlayers();
+
+            const renderPlayerResult = (players) => players.map((p, i) => {
+                const hid = picks[p.uid];
+                const h = hid ? heroById(hid) : null;
+                return `<div class="result-player-card" style="animation-delay:${i * 0.12}s;">
+            <img class="result-player-avatar" src="${p.photo || genAvatar(p.uid)}" alt="">
+            <div>
+                <div class="result-hero-name">${h?.name || '—'}</div>
+                <div class="result-player-name">${p.name}</div>
+            </div>
+            ${h ? `<img class="result-hero-img" src="${heroImg(h)}" alt="${h.name}"><div class="${h.attr}-dot"></div>` : ''}
+        </div>`;
+            }).join('');
+
+            content.innerHTML = `
+        <div class="result-layout">
+            <div style="text-align:center;margin-bottom:32px;">
+                <div style="font-size:32px;margin-bottom:8px;">🏆</div>
+                <div class="big-title">Draft finished!</div>
+                <p style="font-size:12px;color:var(--muted);">Mode: ${roomData.cpRandomMode === 'counter' ? '⚔️ Counter Pick' : '🎲 Full Random'} · ${roomData.cpDraftMode === 'professional' ? 'Professional' : 'Classic'}</p>
+            </div>
+            <div class="result-teams">
+                <div class="result-team-col">
+                    <h3 style="color:var(--radiant);">⚔️ Radiant</h3>
+                    ${renderPlayerResult(rPlayers)}
+                </div>
+                <div class="result-team-col">
+                    <h3 style="color:var(--dire);">⚔️ Dire</h3>
+                    ${renderPlayerResult(dPlayers)}
+                </div>
+            </div>
+            ${isHost() ? `<div style="text-align:center;margin-top:24px;">
+                <button class="btn-reset" onclick="hostReset()">Reset draft</button>
+            </div>`: ''}
+        </div>
+    `;
+            document.getElementById('confirm-bar').style.display = 'none';
+        };
+
+        window.hostReset = async () => {
+            if (!isHost()) return;
+            const resetSelections = {};
+            // Reset confirmed status for all
+            Object.entries(roomData.cpSelections || {}).forEach(([uid, sel]) => {
+                resetSelections[uid] = { heroIds: sel.heroIds || [], starredIds: sel.starredIds || [], confirmed: false };
+            });
+            myConfirmed = false;
+            mySelectedIds = [];
+            myStarredIds = [];
+            await updateRoom({
+                cpStage: 'selection',
+                cpSelections: resetSelections,
+                cpFinalPicks: {},
+                cpCurrentPickerUid: null,
+                cpCurrentSeqIdx: 0,
+                cpDraftSequence: []
+            });
+        };
+
+        /*
+           MAIN RENDER
+        */
+        const render = () => {
+            const stage = roomData.cpStage || 'selection';
+            updateStageBadge();
+            renderSidebar();
+            document.getElementById('header-room').textContent = roomCode ? `ROOM: ${roomCode}` : '';
+
+            // Restore my state from Firestore
+            const mySel = (roomData.cpSelections || {})[localUser.uid] || {};
+            myConfirmed = mySel.confirmed || false;
+
+            // Load from DB if confirmed, or if it's the very first load
+            if (myConfirmed || !window._myLocalStateLoaded) {
+                mySelectedIds = [...(mySel.heroIds || [])];
+                myStarredIds = [...(mySel.starredIds || [])];
+                window._myLocalStateLoaded = true;
+            }
+
+            switch (stage) {
+                case 'selection': renderSelection(); break;
+                case 'ordering': renderOrdering(); break;
+                case 'draft': renderDraft(); break;
+                case 'result': renderResult(); break;
+                default: renderSelection(); break;
+            }
+        };
+
+        /*
+           INIT
+        */
+        const init = async () => {
+            const urlRoom = new URLSearchParams(window.location.search).get('room');
+            if (!urlRoom) {
+                document.getElementById('loading-overlay').style.display = 'none';
+                toast('⚠️ No room code. Please go through the portal.');
+                document.getElementById('content').innerHTML = `
+            <div style="text-align:center;padding:80px;">
+                <p style="font-size:16px;font-weight:700;margin-bottom:16px;">No room code</p>
+                <a href="./index.html" style="color:var(--gold);font-size:13px;font-weight:700;">← Return to portal</a>
+            </div>`;
+                return;
+            }
+            roomCode = urlRoom.toUpperCase();
+
+            onAuthStateChanged(auth, async (u) => {
+                if (u && u.providerData.length > 0) {
+                    localUser = { uid: u.uid, name: u.displayName || 'Player', photo: u.photoURL || genAvatar(u.uid) };
+                } else if (u) {
+                    localUser = { uid: u.uid, name: 'Anonymous', photo: genAvatar(u.uid) };
+                } else {
+                    // Sign in anonymously as fallback
+                    const anonResult = await signInAnonymously(auth);
+                    localUser = { uid: anonResult.user.uid, name: 'Player', photo: genAvatar(anonResult.user.uid) };
+                }
+
+                const ref = roomDocRef(db, roomCode);
+                let snap;
+                try {
+                    snap = await getDoc(ref);
+                } catch (e) {
+                    console.warn("Permission denied, treating as stale:", e);
+                    snap = { exists: () => false };
+                }
+
+                if (!snap.exists()) {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px;"><p>Room <strong>${roomCode}</strong> not found.</p><a href="./index.html" style="color:var(--gold);">← Return to portal</a></div>`;
+                    return;
+                }
+
+                let roomSnap = snap.data();
+                if (isRoomStale(roomSnap, localUser.uid)) {
+                    try { await deleteDoc(ref); } catch (e) { console.warn("Delete failed, overwriting anyway"); }
+                    await setDoc(ref, buildFreshCounterPickRoom(roomCode, localUser));
+                    toast('🧹 Room was idle or corrupt. Started fresh counter lobby.');
+                } else {
+                    const patch = {
+                        [`players.${localUser.uid}`]: {
+                            uid: localUser.uid, name: localUser.name, photo: localUser.photo,
+                            team: (roomSnap.players?.[localUser.uid]?.team || 'unassigned'),
+                            slot: (roomSnap.players?.[localUser.uid]?.slot || -1),
+                        },
+                    };
+                    if (roomSnap.hostUid === localUser.uid) patch.hostLastEnteredAt = Date.now();
+                    await updateDoc(ref, patch);
+                }
+
+                // Subscribe
+                if (unsubRoom) unsubRoom();
+                unsubRoom = onSnapshot(ref, async (d) => {
+                    if (!d.exists()) return;
+                    roomData = d.data();
+
+                    // Host reassignment
+                    const playersObj = roomData.players || {};
+                    const playerUids = Object.keys(playersObj);
+                    if (playerUids.length > 0 && !playersObj[roomData.hostUid]) {
+                        const sortedUids = playerUids.filter(id => !isBot(id)).sort();
+                        if (sortedUids[0] === localUser.uid) {
+                            try {
+                                await updateDoc(ref, { hostUid: localUser.uid, hostLastEnteredAt: Date.now() });
+                                roomData.hostUid = localUser.uid;
+                                toast('👑 You are now the host.');
+                            } catch (e) { }
+                        }
+                    }
+
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    render();
+                    runBotActions();
+                });
+            });
+        };
+
+        init();
+    </script>
+</body>
+
+</html>
