@@ -1124,12 +1124,12 @@
         import { getFirestore, doc, getDoc, onSnapshot, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { HEROES, heroTagTooltipLines, getCounterHeroIdsFromTags } from "./heroes-data.js";
-        import { 
-            isRoomStale, 
-            genAvatar, 
-            hostPresenceMs, 
-            DB_APP_ID, 
-            HOST_STALE_MS, 
+        import {
+            isRoomStale,
+            genAvatar,
+            hostPresenceMs,
+            DB_APP_ID,
+            HOST_STALE_MS,
             roomDocRef,
             initPortalApp
         } from "./index-portal-core.js";
@@ -1333,11 +1333,13 @@
             } catch (e) { }
         };
 
+        let lastBotRollUid = null;
         const runBotDraft = async () => {
             const currentPickerUid = roomData.cpCurrentPickerUid;
             if (!currentPickerUid || !isBot(currentPickerUid)) return;
-            if (isRolling) return;
-            // Bots roll automatically — trigger the same startRoll logic
+            if (isRolling || lastBotRollUid === currentPickerUid) return;
+
+            lastBotRollUid = currentPickerUid;
             // Delay for 1-2s to feel natural
             setTimeout(() => startRoll(currentPickerUid, true), 1000 + Math.random() * 1000);
         };
@@ -1844,11 +1846,11 @@
 
                 if (enemyPicked.length > 0) {
                     if (statusEl) statusEl.textContent = '⚔️ Applying counter-pick logic...';
-                    
+
                     // 1. Try strict (counters ALL enemies)
                     const counterSet = getCounterHeroIdsFromTags(enemyPicked, heroPool);
                     let filtered = heroPool.filter(id => counterSet.has(id));
-                    
+
                     // 2. Fallback: Try softer (counters at least ONE enemy) if strict is too thin
                     if (filtered.length < 3) {
                         const softerSet = new Set();
@@ -1880,12 +1882,12 @@
             }
 
             await animateSlotMachine(heroPool, starredIds, winnerHeroId);
+            isRolling = false;
 
             // Advance to next picker
             if (triggerAnimation || pickerUid === localUser.uid) {
                 await advanceDraft(pickerUid, winnerHeroId);
             }
-            isRolling = false;
         };
 
         const buildWeightedPool = (poolIds, starredIds) => {
@@ -2067,6 +2069,8 @@
             myConfirmed = false;
             mySelectedIds = [];
             myStarredIds = [];
+            lastBotRollUid = null;
+            lastDraftPickerUid = null;
             await updateRoom({
                 cpStage: 'selection',
                 cpSelections: resetSelections,
