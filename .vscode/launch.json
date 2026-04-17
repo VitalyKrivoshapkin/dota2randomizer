@@ -5,7 +5,7 @@
             "name": "Launch with Python Server",
             "type": "chrome",
             "request": "launch",
-            "url": "http://localhost:8000/index.html",
+            "url": "http://localhost:8000/lobby.html",
             "webRoot": "${workspaceFolder}",
             "preLaunchTask": "Start Python Server"
         }

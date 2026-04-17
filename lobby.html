@@ -342,7 +342,7 @@
             currentTurnTeam: 'Radiant', teamSizeRadiant: 5, teamSizeDire: 5,
             pendingHeroId: null, pickDuration: 20, infinitePickTime: false,
             banDuration: 20, infiniteBanTime: false, randomPickIds: {},
-            excludedIds: [17, 42, 60], setupPositions: {}
+            excludedIds: [17, 42, 60], vipIds: [], setupPositions: {}
         };
 
         // --- AUDIO SYSTEM ---
@@ -996,8 +996,30 @@
             const manager = document.getElementById('hero-tag-manager');
             if (manager) tagManagerScrollTop = manager.scrollTop;
             let excl = [...(roomData.excludedIds || [])];
-            if (excl.includes(id)) excl = excl.filter(x => x !== id); else excl.push(id);
-            updateRoom({ excludedIds: excl }, false);
+            let vips = [...(roomData.vipIds || [])];
+            if (excl.includes(id)) {
+                excl = excl.filter(x => x !== id);
+            } else {
+                excl.push(id);
+                vips = vips.filter(x => x !== id);
+            }
+            updateRoom({ excludedIds: excl, vipIds: vips }, false);
+        };
+
+        window.toggleVipHero = (id) => {
+            if (!isAdmin()) return;
+            SoundManager.play('button_click');
+            const manager = document.getElementById('hero-tag-manager');
+            if (manager) tagManagerScrollTop = manager.scrollTop;
+            let excl = [...(roomData.excludedIds || [])];
+            let vips = [...(roomData.vipIds || [])];
+            if (vips.includes(id)) {
+                vips = vips.filter(x => x !== id);
+            } else {
+                vips.push(id);
+                excl = excl.filter(x => x !== id);
+            }
+            updateRoom({ excludedIds: excl, vipIds: vips }, false);
         };
         // Step 1: Unified function — computes pool locally, ONE write to start banning
         window.startDraftAction = async () => {
@@ -1022,7 +1044,8 @@
                 data.nValues.forEach((n, i) => {
                     const pos = i + 1;
                     const excludedSet = new Set(data.excludedIds || []);
-                    HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excludedSet.has(h.id))
+                    const vipSet = new Set(data.vipIds || []);
+                    HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excludedSet.has(h.id) && !vipSet.has(h.id))
                         .sort(() => 0.5 - Math.random()).slice(0, n)
                         .forEach(h => { used.add(h.id); pl.push(h.id); });
                 });
@@ -1052,7 +1075,7 @@
                     playersObj[uid].team = 'unassigned';
                     playersObj[uid].slot = -1;
                 });
-                return { stage: 'lobby', players: playersObj, pool: [], bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {}, votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0, excludedIds: [17, 42, 60], setupPositions: {} };
+                return { stage: 'lobby', players: playersObj, pool: [], bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {}, votes: {}, pendingHeroId: null, isExtraTime: false, timerStart: 0, excludedIds: [17, 42, 60], vipIds: [], setupPositions: {} };
             });
             localSetupPositions = {}; localExcludedIds = new Set([17, 42, 60]);
         };
@@ -1091,7 +1114,7 @@
                 return;
             }
             // Reset setup state when entering setup stage
-            updateRoom({ stage: 'setup', excludedIds: [17, 42, 60], setupPositions: {} }, true);
+            updateRoom({ stage: 'setup', excludedIds: [17, 42, 60], vipIds: [], setupPositions: {} }, true);
         };
 
         window.confirmPickAction = async (automated = false) => {
@@ -1113,7 +1136,7 @@
                 await transactionalUpdateRoom((data) => {
                     const turnP = getCurrentPickPlayer(data);
                     if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
-                    if (!data.pool?.includes(hId)) return null;
+                    if (!data.pool?.includes(hId) && !data.vipIds?.includes(hId)) return null;
 
                     const bansArr = Object.values(data.bans || {});
                     const pR = Object.values(data.picksRadiant || {});
@@ -1157,7 +1180,8 @@
                     const bansArr = Object.values(data.bans || {});
                     const pR = Object.values(data.picksRadiant || {});
                     const pD = Object.values(data.picksDire || {});
-                    const avail = (data.pool || []).filter(id => !bansArr.some(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
+                    const combinedPool = [...(data.pool || []), ...(data.vipIds || [])];
+                    const avail = combinedPool.filter(id => !bansArr.some(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
                     if (avail.length === 0) return null;
 
                     const hId = avail[Math.floor(Math.random() * avail.length)];
@@ -1239,10 +1263,16 @@
             SoundManager.play('button_click');
             if (roomData.stage === 'formation') return;
             const playersArr = Object.values(roomData.players || {});
+            const isVip = roomData.vipIds?.includes(heroId);
+            
             if (roomData.stage === 'banning') {
+                if (isVip) {
+                    console.log("VIP Heroes cannot be banned");
+                    return;
+                }
                 const myT = playersArr.find(p => p.uid === localUser.uid)?.team;
                 if (myT !== roomData.currentTurnTeam) return;
-                await updateRoom({ [`votes.${localUser.uid}`]: heroId }, true); // Force immediate sync for votes to prevent race with finalizeTurn
+                await updateRoom({ [`votes.${localUser.uid}`]: heroId }, true);
             } else if (roomData.stage === 'picking') {
                 const turnP = getCurrentPickPlayer();
                 const bansArr = Object.values(roomData.bans || {});
@@ -1304,7 +1334,8 @@
             const strats = getStrategies(rPlayers, dPlayers);
             const host = isAdmin();
             const excludedSet = new Set(roomData.excludedIds || []);
-            const posCounts = [1, 2, 3, 4, 5].map(p => HEROES.filter(h => getHeroPositions(h.id).includes(p) && !excludedSet.has(h.id)).length);
+            const vipSet = new Set(roomData.vipIds || []);
+            const posCounts = [1, 2, 3, 4, 5].map(p => HEROES.filter(h => getHeroPositions(h.id).includes(p) && !excludedSet.has(h.id) && !vipSet.has(h.id)).length);
 
             c.innerHTML = `<div class="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
                 <div class="relative flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/5 mb-8 gap-6">
@@ -1378,31 +1409,51 @@
                         </div>
                     </div>
                     <div class="space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-[1.5fr_0.8fr_0.8fr] gap-6">
                             <div class="space-y-3">
                                 <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">Active Heroes</h3>
                                 <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-3 gap-3">
-                                        ${HEROES.filter(h => !excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                const hPos = getHeroPositions(h.id);
-                return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
-                                                <div onclick="toggleExcludeHero(${h.id})" class="w-full aspect-[3/4] rounded-lg overflow-hidden cursor-pointer border-2 border-white/5 group-hover:border-white/30 transition-all">${getHeroImg(h)}</div>
+                                        ${HEROES.filter(h => !excludedSet.has(h.id) && !vipSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
+                                            const hPos = getHeroPositions(h.id);
+                                            return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
+                                                <div class="relative w-full aspect-[3/4] rounded-lg overflow-hidden border-2 border-white/5 group-hover:border-white/30 transition-all">
+                                                    ${getHeroImg(h)}
+                                                    ${host ? `
+                                                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 p-2">
+                                                        <button onclick="toggleExcludeHero(${h.id})" class="w-full py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-black text-[8px] uppercase shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">Ban</button>
+                                                        <button onclick="toggleVipHero(${h.id})" class="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded-lg font-black text-[8px] uppercase shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 delay-75">VIP</button>
+                                                    </div>` : ''}
+                                                </div>
                                                 <div class="flex gap-0.5">${[1, 2, 3, 4, 5].map(p => `<span onclick="toggleHeroPosition(${h.id}, ${p})" class="role-tag ${hPos.includes(p) ? 'active' : 'inactive'} text-[6px]">${p}</span>`).join('')}</div>
                                             </div>`;
-            }).join('')}
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <h3 class="text-[10px] font-black uppercase text-amber-500 border-b border-white/5 pb-2">VIP List</h3>
+                                <div id="hero-vip-list" class="bg-amber-500/5 rounded-[2rem] border border-amber-500/10 h-[640px] overflow-y-auto p-4 scrollbar-custom">
+                                    <div class="grid grid-cols-1 gap-3">
+                                        ${HEROES.filter(h => vipSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
+                                            return `<div onclick="toggleVipHero(${h.id})" class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-amber-500/20 transition-all" draggable="false">
+                                                <div class="w-full aspect-[3/4] rounded-lg overflow-hidden group-hover:scale-105 transition-all">${getHeroImg(h)}</div>
+                                                <span class="text-[8px] font-black uppercase text-amber-500 truncate w-full text-center">${h.name}</span>
+                                            </div>`;
+                                        }).join('')}
                                     </div>
                                 </div>
                             </div>
                             <div class="space-y-3">
                                 <h3 class="text-[10px] font-black uppercase text-red-500 border-b border-white/5 pb-2">Ban List</h3>
                                 <div id="hero-ban-list" class="bg-red-500/5 rounded-[2rem] border border-red-500/10 h-[640px] overflow-y-auto p-4 scrollbar-custom">
-                                    <div class="grid grid-cols-2 gap-3">
+                                    <div class="grid grid-cols-1 gap-3">
                                         ${HEROES.filter(h => excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
+                                            return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
                                                 <div class="w-full aspect-[3/4] rounded-lg overflow-hidden grayscale opacity-50 group-hover:opacity-100 group-hover:grayscale-0 transition-all">${getHeroImg(h)}</div>
                                                 <span class="text-[8px] font-black uppercase text-red-500 truncate w-full text-center">${h.name}</span>
                                             </div>`;
-            }).join('')}
+                                        }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -1588,7 +1639,37 @@
                         })()}
                             </div>
                         </div>
-                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-x-6 gap-y-10">${sortedPool.map((h, idx) => {
+                        <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-x-6 gap-y-10">
+                            ${(() => {
+                                const hydVips = (roomData.vipIds || []).map(id => getHeroById(id)).filter(Boolean);
+                                const sortedVips = [...hydVips].sort((a, b) => a.name.localeCompare(b.name));
+                                if (sortedVips.length === 0) return '';
+                                return `
+                                <div class="col-span-full mb-8 pb-8 border-b border-white/5 px-4 w-full">
+                                    <h3 class="text-[10px] font-black uppercase text-amber-500 mb-6 tracking-[0.3em] flex items-center justify-center gap-4">
+                                        <span class="w-12 h-px bg-amber-500/20"></span>
+                                        VIP HERO LIST
+                                        <span class="w-12 h-px bg-amber-500/20"></span>
+                                    </h3>
+                                    <div class="flex flex-wrap items-center justify-center gap-6">
+                                        ${sortedVips.map(h => {
+                                            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
+                                            const picksDireArr = Object.values(roomData.picksDire || {});
+                                            const isPick = picksRadiantArr.includes(h.id) || picksDireArr.includes(h.id);
+                                            const pend = roomData.pendingHeroId === h.id;
+                                            return `<div onclick="${!isPick ? `handleHeroClick(${h.id})` : ''}" class="group flex flex-col items-center gap-2 ${!isPick ? 'cursor-pointer' : ''} transition-all">
+                                                <div class="hero-img-container w-20 h-28 rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (isPick ? 'border-transparent' : 'border-amber-500/30')} ${isPick ? 'hero-picked-fx' : ''} shadow-xl group-hover:border-amber-500 transition-all">
+                                                    ${getHeroImg(h)}
+                                                    ${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none transition-all"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-2 rounded-lg shadow-lg">PICK</span></div>` : ''}
+                                                    ${!isPick ? `<div class="absolute top-1 right-1 bg-amber-500 text-black text-[6px] font-black px-1 rounded shadow-lg opacity-80 group-hover:opacity-100">VIP</div>` : ''}
+                                                </div>
+                                                <span class="text-[8px] font-black uppercase ${isPick ? 'text-slate-800' : 'text-amber-500'} group-hover:text-white truncate max-w-[80px] text-center">${h.name}</span>
+                                            </div>`;
+                                        }).join('')}
+                                    </div>
+                                </div>`;
+                            })()}
+                            ${sortedPool.map((h, idx) => {
                             const isBan = Object.values(roomData.bans || {}).find(x => x.i === h.id);
                             const picksRadiantArr = Object.values(roomData.picksRadiant || {});
                             const picksDireArr = Object.values(roomData.picksDire || {});
