@@ -1039,6 +1039,7 @@
             if (immediate) {
                 if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
                 const toSend = { ..._pendingUpdate };
+                if (isAdmin()) toSend.hostLastSeen = Date.now();
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
                 } finally {
@@ -1049,6 +1050,7 @@
                 _debounceTimer = setTimeout(async () => {
                     _debounceTimer = null;
                     const toSend = { ..._pendingUpdate };
+                    if (isAdmin()) toSend.hostLastSeen = Date.now();
                     if (Object.keys(toSend).length > 0) {
                         try {
                             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomData.id), toSend);
@@ -1071,8 +1073,12 @@
                 await runTransaction(db, async (transaction) => {
                     const snap = await transaction.get(ref);
                     if (!snap.exists()) return;
-                    const updates = updateFn(snap.data());
-                    if (updates) transaction.update(ref, updates);
+                    const data = snap.data();
+                    const updates = updateFn(data);
+                    if (updates) {
+                        if (data.hostUid === localUser.uid) updates.hostLastSeen = Date.now();
+                        transaction.update(ref, updates);
+                    }
                 });
             } catch (e) {
                 console.warn("Transact conflict/fail:", e);
@@ -2155,6 +2161,7 @@
             playersMap[localUser.uid] = { ...localUser, team: 'unassigned', slot: -1 };
             const initD = {
                 id: code, stage: 'lobby', players: playersMap, hostUid: localUser.uid,
+                createdAt: Date.now(), hostLastSeen: Date.now(),
                 nValues: [5, 5, 5, 5, 5], pool: [], bans: {}, picksRadiant: {}, picksDire: {},
                 teamSizeRadiant: 5, teamSizeDire: 5, draftSequence: [], bansRadiant: 2, bansDire: 2,
                 strategyIdx: 0, timerStart: 0, isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant',
@@ -2171,10 +2178,22 @@
                     await setDoc(ref, initD);
                     logEvent(analytics, 'lobby_joined', { room_id: code, is_host: true });
                 } else {
-                    await transactionalUpdateRoom((data) => {
-                        return { [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } };
-                    });
-                    logEvent(analytics, 'lobby_joined', { room_id: code, is_host: false });
+                    const data = snap.data();
+                    const lastSeen = data.hostLastSeen;
+                    const isStale = !lastSeen || (Date.now() - lastSeen > 10800000); // 3 hours
+
+                    if (isStale) {
+                        console.log("Lobby is stale, resetting...");
+                        await setDoc(ref, initD);
+                        logEvent(analytics, 'lobby_joined', { room_id: code, is_host: true });
+                    } else {
+                        await transactionalUpdateRoom((d) => {
+                            const updates = { [`players.${localUser.uid}`]: { ...localUser, team: 'unassigned', slot: -1 } };
+                            if (d.hostUid === localUser.uid) updates.hostLastSeen = Date.now();
+                            return updates;
+                        });
+                        logEvent(analytics, 'lobby_joined', { room_id: code, is_host: false });
+                    }
                 }
 
                 onSnapshot(ref, d => {
