@@ -539,6 +539,7 @@
         let botActionTimeout = null;
         let _lastPickWasManual = false;
         let tagManagerScrollTop = 0;
+        window.heroSearchQuery = ""; // Local host filter (attached to window for HTML accessibility)
 
         // Step 1: Local-First Setup — bridged to Firestore with 1s debounce
         function getLocalExcludedIds() { return new Set(roomData.excludedIds || []); }
@@ -1411,10 +1412,13 @@
                     <div class="space-y-6">
                         <div class="grid grid-cols-1 md:grid-cols-[1.5fr_0.8fr_0.8fr] gap-6">
                             <div class="space-y-3">
-                                <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">Active Heroes</h3>
+                                <div class="flex flex-col gap-3">
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">Active Heroes</h3>
+                                    ${host ? `<input id="hero-search-input" type="text" placeholder="Search hero..." value="${window.heroSearchQuery}" oninput="window.heroSearchQuery = this.value; window.render();" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase focus:border-amber-500 outline-none transition-all placeholder:opacity-30 shadow-inner">` : ''}
+                                </div>
                                 <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-3 gap-3">
-                                        ${HEROES.filter(h => !excludedSet.has(h.id) && !vipSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
+                                        ${HEROES.filter(h => !excludedSet.has(h.id) && !vipSet.has(h.id) && h.name.toLowerCase().includes((window.heroSearchQuery || "").toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
                                             const hPos = getHeroPositions(h.id);
                                             return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
                                                 <div class="relative w-full aspect-[3/4] rounded-lg overflow-hidden border-2 border-white/5 group-hover:border-white/30 transition-all">
@@ -1467,6 +1471,14 @@
             lucide.createIcons();
             const manager = document.getElementById('hero-tag-manager');
             if (manager) manager.scrollTop = tagManagerScrollTop;
+
+            if (window.heroSearchQuery) {
+                const input = document.getElementById('hero-search-input');
+                if (input) {
+                    input.focus();
+                    input.setSelectionRange(input.value.length, input.value.length);
+                }
+            }
         };
 
         const renderDraft = (c) => {
@@ -1725,7 +1737,7 @@
             lucide.createIcons();
         };
 
-        const render = () => {
+        window.render = () => {
             const container = document.getElementById('main-content');
             renderHeader();
             if (!roomData.id || roomData.stage === 'entry') { renderEntry(container); return; }
