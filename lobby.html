@@ -329,6 +329,278 @@
         const analytics = getAnalytics(app);
         const provider = new GoogleAuthProvider();
 
+        // --- LOCALIZATION SYSTEM ---
+        const TRANSLATIONS = {
+            ru: {
+                // Header & Entry
+                room: "КОМНАТА",
+                pro_edition: "PRO EDITION v8.20",
+                google_login: "Войти через Google",
+                offline_mode: "Оффлайн режим",
+                lobby_code_placeholder: "КОД КОМНАТЫ",
+                connect_lobby: "Подключиться",
+                play_offline_instead: "Играть оффлайн вместо этого",
+                logout: "Выйти",
+
+                // Lobby
+                radiant: "Radiant",
+                dire: "Dire",
+                host_badge: "ХОСТ",
+                shuffle_teams: "Перемешать команды",
+                add_bot: "Добавить бота",
+                start_btn: "Начать",
+                need_players_warning: "Нужны игроки в обеих командах",
+                waiting_for_start: "Ожидание начала...",
+                host_label: "Хост:",
+
+                // Setup
+                draft_config: "Конфигурация Драфта",
+                hero_pool_rows: "Ряды пула героев",
+                total_label: "ВСЕГО",
+                pick_timer: "Таймер Пика (сек)",
+                ban_timer: "Таймер Бана (сек)",
+                no_limit: "Без лимита",
+                bans_setting: "Настройка Банов",
+                pool_size_warning: "Внимание: Нужно {needed} героев, есть {total}",
+                pool_size_ok: "Размер пула достаточен",
+                pick_strategy: "Стратегия пика",
+                active_heroes: "Активные герои",
+                search_hero_placeholder: "Поиск героя...",
+                vip_list: "VIP Список",
+                ban_list: "Список Банов",
+                generate_heroes_btn: "Сгенерировать список героев",
+                wait_for_host: "Ожидание хоста...",
+
+                // Draft
+                banning_phase: "Этап Бана",
+                picking_phase: "Этап Пика",
+                battle_start: "НАЧАЛО БИТВЫ",
+                banned_heroes_label: "Забаненные герои",
+                remaining_pool_label: "Оставшиеся герои в пуле",
+                reset_draft: "Сбросить Драфт",
+                confirm_btn: "Подтвердить",
+                random_btn: "Случайный",
+                vip_status: "Статус VIP героев",
+                bot_empty: "Бот / Пусто",
+                cancel_draft_confirm: "Вы уверены, что хотите прервать драфт и вернуться в лобби? Все текущие пики/баны будут сброшены.",
+                reset_lobby_confirm: "Сбросить все лобби? Все участники будут перемещены в нераспределенные.",
+                both_teams_needed_alert: "В обеих командах должен быть хотя бы один игрок или бот для начала.",
+                hero_taken_warning: "Герой уже выбран или забанен",
+                slot_taken_warning: "Слот уже занят",
+                account_blocked_alert: "Ваш аккаунт был заблокирован. Пожалуйста, свяжитесь с поддержкой.",
+                ban_label: "БАН",
+                pick_label: "ПИК",
+                radiant: "Radiant",
+                dire: "Dire",
+                your_turn: "ВАШ ХОД!",
+                pool_gen: "ГЕНЕРАЦИЯ ПУЛА",
+                forming: "ФОРМИРОВАНИЕ...",
+                votes_submitted: "ГОЛОСОВ ПОДАНО",
+                progress: "Прогресс",
+                results: "Результаты",
+                lobby: "Лобби",
+                entry: "Вход",
+                formation: "Подготовка",
+                banning: "Бан",
+                picking: "Пик",
+                team_voting_status: "Статус голосования команды",
+                waiting_for_who: "Кого мы ждем?",
+                vip_hero_list: "VIP СПИСОК ГЕРОЕВ",
+                extra_time: "ДОП. ВРЕМЯ!",
+                init: "ИНИЦ"
+            },
+            ykt: {
+                // Header & Entry
+                room: "ХОНОК (ROOM)",
+                pro_edition: "PRO EDITION v8.20",
+                google_login: "Google нөҥүө киирии",
+                offline_mode: "Оффлайн эрэжим",
+                lobby_code_placeholder: "ЛОББИ КОДА",
+                connect_lobby: "Лоббига киир",
+                play_offline_instead: "Оффлайн оонньоо",
+                logout: "Таҕыс",
+
+                // Lobby
+                radiant: "Radiant",
+                dire: "Dire",
+                host_badge: "ХОСТ",
+                shuffle_teams: "Хамаандалары булкуй",
+                add_bot: "Бот эппиэй",
+                start_btn: "Саҕалаа",
+                need_players_warning: "Икки хамаандаҕа оонньооччулар наадалар",
+                waiting_for_start: "Саҕаланарын күүтүү...",
+                host_label: "Хост:",
+
+                // Setup
+                draft_config: "Драфт туруоруулара",
+                hero_pool_rows: "Геройдар кэккэлэрэ",
+                total_label: "БАРЫТА",
+                pick_timer: "Пик таймера (сек)",
+                ban_timer: "Бан таймера (сек)",
+                no_limit: "Чакы суох",
+                bans_setting: "Бан туруоруута",
+                pool_size_warning: "Сэрэтии: {needed} герой наада, баар {total}",
+                pool_size_ok: "Герой тиийэр",
+                pick_strategy: "Пик стратегията",
+                active_heroes: "Активнай геройдар",
+                search_hero_placeholder: "Геройу көрдөө...",
+                vip_list: "VIP испииһэк",
+                ban_list: "Бан испииһэк",
+                generate_heroes_btn: "Геройдар испииһэгин оҥор",
+                wait_for_host: "Хоһу күүт...",
+
+                // Draft
+                banning_phase: "Бан түһүмэҕэ",
+                picking_phase: "Пик түһүмэҕэ",
+                battle_start: "КИИРСИИ САҔАЛАННА",
+                banned_heroes_label: "Баннаммыт геройдар",
+                remaining_pool_label: "Хаалбыт геройдар",
+                reset_draft: "Драфты саҥаттан саҕалаа",
+                confirm_btn: "Бигэргэт",
+                random_btn: "Рандом",
+                vip_status: "VIP геройдар туруктара",
+                bot_empty: "Бот / Кураанах",
+                cancel_draft_confirm: "Драфты тохтотон лоббига төннөҕүн дуо? Бары талыллыбыт геройдар сотуллуохтара.",
+                reset_lobby_confirm: "Лоббины саҥардаҕын дуо? Бары кыттааччылар миэстэлэриттэн тахсыахтара.",
+                both_teams_needed_alert: "Саҕалыыр наадатыгар хас биирдии хамаандаҕа биир эмэ оонньооччу эбэтэр бот наада.",
+                hero_taken_warning: "Бу герой талыллыбыт эбэтэр баннаммыт",
+                slot_taken_warning: "Миэстэ атын киһинэн тутуллубут",
+                account_blocked_alert: "Эн аккаунн блоктаах. Көмөҕө (support) суруй.",
+                ban_label: "БАН",
+                pick_label: "ПИК",
+                radiant: "Radiant",
+                dire: "Dire",
+                your_turn: "ЭН УОЧУРАҤ!",
+                pool_gen: "ПУЛ ГЕН",
+                forming: "ОҤОРООҺУН...",
+                votes_submitted: "КУОЛАСТАР БИРИЛИБИТТЭР",
+                progress: "Ситиһии",
+                results: "Түмүктэр",
+                lobby: "Лобби",
+                entry: "Киирии",
+                formation: "Оҥоһуу",
+                banning: "Баннааһын",
+                picking: "Талыы",
+                team_voting_status: "Хамаанда куоластааһына",
+                waiting_for_who: "Кими күүтэбит?",
+                vip_hero_list: "VIP ГЕРОЙДАР ИСПИИҺЭКТЭРЭ",
+                extra_time: "ЭБИИ БИРИЭМЭ!",
+                init: "ИНИТ"
+            },
+            en: {
+                // Header & Entry
+                room: "ROOM",
+                pro_edition: "PRO EDITION v8.20",
+                google_login: "Google Sign In",
+                offline_mode: "Offline Mode",
+                lobby_code_placeholder: "LOBBY CODE",
+                connect_lobby: "Connect Lobby",
+                play_offline_instead: "Play Offline Instead",
+                logout: "Logout",
+
+                // Lobby
+                radiant: "Radiant",
+                dire: "Dire",
+                host_badge: "HOST",
+                shuffle_teams: "Shuffle Teams",
+                add_bot: "Add Bot",
+                start_btn: "Start",
+                need_players_warning: "Need players in both teams",
+                waiting_for_start: "Waiting for start...",
+                host_label: "Host:",
+
+                // Setup
+                draft_config: "Draft Configuration",
+                hero_pool_rows: "Hero Pool Rows",
+                total_label: "TOTAL",
+                pick_timer: "Pick Timer (sec)",
+                ban_timer: "Ban Timer (sec)",
+                no_limit: "No Limit",
+                bans_setting: "Bans Setting",
+                pool_size_warning: "Warning: Need {needed} heroes, have {total}",
+                pool_size_ok: "Pool size is sufficient",
+                pick_strategy: "Pick Strategy",
+                active_heroes: "Active Heroes",
+                search_hero_placeholder: "Search hero...",
+                vip_list: "VIP List",
+                ban_list: "Ban List",
+                generate_heroes_btn: "Generate Heroes List",
+                wait_for_host: "Wait for host...",
+
+                // Draft
+                banning_phase: "Banning Phase",
+                picking_phase: "Picking Phase",
+                battle_start: "BATTLE START",
+                banned_heroes_label: "Banned Heroes",
+                remaining_pool_label: "Remaining Hero Pool",
+                reset_draft: "Reset Draft",
+                confirm_btn: "Confirm",
+                random_btn: "Random",
+                vip_status: "VIP Heroes Status",
+                bot_empty: "Bot / Empty",
+                cancel_draft_confirm: "Are you sure you want to cancel the draft and return to the lobby? All current picks/bans will be reset.",
+                reset_lobby_confirm: "Reset entire lobby? All participants will be moved to unassigned.",
+                both_teams_needed_alert: "Both teams must have at least one player or bot to start.",
+                hero_taken_warning: "Hero already picked or banned",
+                slot_taken_warning: "Slot already taken",
+                account_blocked_alert: "Your account has been blocked. Please contact support.",
+                ban_label: "BAN",
+                pick_label: "PICK",
+                radiant: "Radiant",
+                dire: "Dire",
+                your_turn: "YOUR TURN!",
+                pool_gen: "POOL GEN",
+                forming: "FORMING...",
+                votes_submitted: "VOTES SUBMITTED",
+                progress: "Progress",
+                results: "Results",
+                lobby: "Lobby",
+                entry: "Entry",
+                formation: "Formation",
+                banning: "Banning",
+                picking: "Picking",
+                team_voting_status: "Team Voting Status",
+                waiting_for_who: "Who are we waiting for?",
+                vip_hero_list: "VIP HERO LIST",
+                extra_time: "EXTRA TIME!",
+                init: "INIT"
+            }
+        };
+
+        window.currentLanguage = localStorage.getItem('dota_drafter_lang') || 'ru';
+
+        window.t = (key, params = {}) => {
+            let str = TRANSLATIONS[window.currentLanguage]?.[key] || TRANSLATIONS['en']?.[key] || key;
+            for (const [k, v] of Object.entries(params)) {
+                str = str.replace(`{${k}}`, v);
+            }
+            return str;
+        };
+
+        window.setLanguage = (lang) => {
+            window.currentLanguage = lang;
+            window.langDropdownOpen = false;
+            localStorage.setItem('dota_drafter_lang', lang);
+            window.render();
+        };
+
+        window.langDropdownOpen = false;
+        window.toggleLangDropdown = (e) => {
+            e.stopPropagation();
+            window.langDropdownOpen = !window.langDropdownOpen;
+            window.render();
+        };
+
+        document.addEventListener('click', (e) => {
+            if (window.langDropdownOpen) {
+                const dropdown = document.querySelector('.lang-dropdown-container');
+                if (dropdown && !dropdown.contains(e.target)) {
+                    window.langDropdownOpen = false;
+                    window.render();
+                }
+            }
+        });
+
         const ANIM_DELAY = 5500;
         const CDN_BASE = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/";
 
@@ -892,7 +1164,7 @@
                 isLocalMode = false;
             } catch (error) {
                 if (error.code === 'auth/user-disabled') {
-                    alert("Ваш аккаунт был заблокирован. Пожалуйста, свяжитесь с поддержкой.");
+                    alert(t('account_blocked_alert'));
                 } else {
                     console.error("Ошибка входа:", error.message || error);
                 }
@@ -1068,7 +1340,7 @@
 
         window.startOverAction = async () => {
             if (!isAdmin()) return;
-            if (!confirm("Reset entire lobby? All participants will be moved to unassigned.")) return;
+            if (!confirm(t('reset_lobby_confirm'))) return;
             SoundManager.play('button_click');
             await transactionalUpdateRoom((data) => {
                 const playersObj = { ...data.players };
@@ -1089,7 +1361,7 @@
 
         window.goBackToLobbyAction = async () => {
             if (!isAdmin()) return;
-            if (!confirm("Вы уверены, что хотите прервать драфт и вернуться в лобби? Все текущие пики/баны будут сброшены.")) return;
+            if (!confirm(t('cancel_draft_confirm'))) return;
             await updateRoom({
                 stage: 'lobby',
                 pool: [],
@@ -1111,7 +1383,7 @@
             const rCount = playersArr.filter(p => p.team === 'Radiant').length;
             const dCount = playersArr.filter(p => p.team === 'Dire').length;
             if (rCount === 0 || dCount === 0) {
-                alert("Both teams must have at least one player or bot to start.");
+                alert(t('both_teams_needed_alert'));
                 return;
             }
             // Reset setup state when entering setup stage
@@ -1265,7 +1537,7 @@
             if (roomData.stage === 'formation') return;
             const playersArr = Object.values(roomData.players || {});
             const isVip = roomData.vipIds?.includes(heroId);
-            
+
             if (roomData.stage === 'banning') {
                 if (isVip) {
                     console.log("VIP Heroes cannot be banned");
@@ -1289,8 +1561,8 @@
             const logged = !isLocalMode && localUser.uid && !localUser.uid.startsWith('local_');
             c.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[60vh] gap-10 animate-in fade-in zoom-in duration-700">
                 <div class="text-center space-y-4"><h2 class="text-6xl font-black italic uppercase pr-4 text-shimmer">Dota 2 Drafter</h2></div>
-                <div class="w-full max-w-sm space-y-6">${!logged ? `<button onclick="loginWithGoogle()" class="w-full bg-white text-black p-5 rounded-3xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-4 shadow-xl"><i data-lucide="log-in" class="w-6 h-6"></i> Google Sign In</button><button onclick="loginOfflineAction()" class="w-full bg-white/5 border border-white/10 p-5 rounded-3xl font-black uppercase tracking-widest hover:bg-white/10 transition-all">Offline Mode</button>` : `
-                    <div class="space-y-4 animate-in slide-in-from-top duration-500"><input id="room-code-input" type="text" placeholder="LOBBY CODE" class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl text-center font-black uppercase tracking-widest focus:border-amber-500 outline-none transition-all text-xl"><button onclick="joinRoomAction()" class="w-full bg-amber-500 text-black p-5 rounded-3xl font-black uppercase tracking-widest hover:bg-amber-400 shadow-xl">Connect Lobby</button><button onclick="loginOfflineAction()" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl font-black uppercase text-[10px] opacity-40 hover:opacity-100">Play Offline Instead</button></div>`}</div></div>`;
+                <div class="w-full max-w-sm space-y-6">${!logged ? `<button onclick="loginWithGoogle()" class="w-full bg-white text-black p-5 rounded-3xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-4 shadow-xl"><i data-lucide="log-in" class="w-6 h-6"></i> ${t('google_login')}</button><button onclick="loginOfflineAction()" class="w-full bg-white/5 border border-white/10 p-5 rounded-3xl font-black uppercase tracking-widest hover:bg-white/10 transition-all">${t('offline_mode')}</button>` : `
+                    <div class="space-y-4 animate-in slide-in-from-top duration-500"><input id="room-code-input" type="text" placeholder="${t('lobby_code_placeholder')}" class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl text-center font-black uppercase tracking-widest focus:border-amber-500 outline-none transition-all text-xl"><button onclick="joinRoomAction()" class="w-full bg-amber-500 text-black p-5 rounded-3xl font-black uppercase tracking-widest hover:bg-amber-400 shadow-xl">${t('connect_lobby')}</button><button onclick="loginOfflineAction()" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl font-black uppercase text-[10px] opacity-40 hover:opacity-100">${t('play_offline_instead')}</button></div>`}</div></div>`;
             lucide.createIcons();
         };
 
@@ -1303,20 +1575,20 @@
             const dCount = players.filter(p => p.team === 'Dire').length;
             const canStart = rCount > 0 && dCount > 0;
 
-            const renderHostBadge = (p) => p.uid === roomData.hostUid ? `<span class="ml-1 bg-amber-500 text-black text-[6px] px-1 rounded-sm font-black">HOST</span>` : '';
+            const renderHostBadge = (p) => p.uid === roomData.hostUid ? `<span class="ml-1 bg-amber-500 text-black text-[6px] px-1 rounded-sm font-black">${t('host_badge')}</span>` : '';
 
             c.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom duration-500">
-                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-green-500 mb-6 uppercase">Radiant</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Radiant' && x.slot === i); return `<div onclick="joinTeamAction('Radiant', ${i})" class="slot-box group ${p ? 'player-active border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}${renderHostBadge(p)}</div>${host ? `<button onclick="event.stopPropagation(); kickPlayerAction('${p.uid}')" class="absolute top-2 right-2 w-6 h-6 bg-red-600/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20 shadow-lg backdrop-blur-sm"><i data-lucide="x" class="w-3 h-3 text-white"></i></button>` : ''}` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
-                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-red-600 mb-6 uppercase text-right">Dire</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Dire' && x.slot === i); return `<div onclick="joinTeamAction('Dire', ${i})" class="slot-box group ${p ? 'player-active border-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.1)]' : 'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}${renderHostBadge(p)}</div>${host ? `<button onclick="event.stopPropagation(); kickPlayerAction('${p.uid}')" class="absolute top-2 right-2 w-6 h-6 bg-red-600/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20 shadow-lg backdrop-blur-sm"><i data-lucide="x" class="w-3 h-3 text-white"></i></button>` : ''}` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
+                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-green-500 mb-6 uppercase">${t('radiant')}</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Radiant' && x.slot === i); return `<div onclick="joinTeamAction('Radiant', ${i})" class="slot-box group ${p ? 'player-active border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}${renderHostBadge(p)}</div>${host ? `<button onclick="event.stopPropagation(); kickPlayerAction('${p.uid}')" class="absolute top-2 right-2 w-6 h-6 bg-red-600/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20 shadow-lg backdrop-blur-sm"><i data-lucide="x" class="w-3 h-3 text-white"></i></button>` : ''}` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
+                <div><div class="team-card p-8 rounded-[3rem] border-2 border-white/5"><h3 class="text-2xl font-black italic text-red-600 mb-6 uppercase text-right">${t('dire')}</h3><div class="grid grid-cols-5 gap-4">${Array(5).fill(0).map((_, i) => { const p = players.find(x => x.team === 'Dire' && x.slot === i); return `<div onclick="joinTeamAction('Dire', ${i})" class="slot-box group ${p ? 'player-active border-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.1)]' : 'cursor-pointer hover:bg-white/5'}">${p ? `<img src="${p.photo}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-2 text-[8px] font-black uppercase truncate">${p.name}${renderHostBadge(p)}</div>${host ? `<button onclick="event.stopPropagation(); kickPlayerAction('${p.uid}')" class="absolute top-2 right-2 w-6 h-6 bg-red-600/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20 shadow-lg backdrop-blur-sm"><i data-lucide="x" class="w-3 h-3 text-white"></i></button>` : ''}` : '<i data-lucide="plus" class="w-4 h-4 opacity-20"></i>'}</div>`; }).join('')}</div></div></div>
                 <div class="lg:col-span-2 flex flex-col md:flex-row gap-6">
                     <div class="flex-1 p-6 bg-white/5 rounded-3xl border border-white/5 flex flex-wrap gap-3">${players.filter(p => p.team === 'unassigned').map(p => `<div class="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-xl border border-white/5 group relative"><img src="${p.photo}" class="w-5 h-5 rounded"><span class="text-[10px] font-bold uppercase">${p.name}${renderHostBadge(p)}</span>${host && p.uid.startsWith('bot_') ? `<button onclick="assignBotAction('${p.uid}')" class="absolute -top-2 -right-2 bg-amber-500 hover:bg-amber-400 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 shadow-lg text-black" title="В случайную команду (Radiant/Dire)"><i data-lucide="dices" class="w-3 h-3"></i></button>` : ''}</div>`).join('')}<div onclick="joinTeamAction('unassigned', -1)" class="w-10 h-10 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:bg-white/5"><i data-lucide="user-minus" class="w-4 h-4 opacity-30"></i></div></div>
                     <div class="team-card p-6 rounded-[2rem] bg-amber-500/5 border-amber-500/10 flex flex-col gap-3 min-w-[240px]">
                         ${host ? `
-                            <button onclick="shuffleAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Shuffle Teams</button>
-                            <button onclick="addBotAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">Add Bot</button>
-                            <button onclick="startDraftSetup()" class="w-full py-4 bg-amber-500 text-black rounded-2xl font-black uppercase text-xs mt-2 transition-all active:scale-95 shadow-lg shadow-amber-500/20 disabled:opacity-20 disabled:pointer-events-none" ${!canStart ? 'disabled' : ''}>Start</button>
-                            ${!canStart ? `<p class="text-[7px] font-black text-red-500 uppercase text-center animate-pulse">Need players in both teams</p>` : ''}
-                        ` : `<div class="py-4 text-center"><p class="text-[10px] font-black text-amber-500/60 uppercase">Host: ${hostName}</p><p class="text-[8px] font-black text-slate-600 animate-pulse uppercase mt-1">Waiting for start...</p></div>`}
+                            <button onclick="shuffleAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">${t('shuffle_teams')}</button>
+                            <button onclick="addBotAction()" class="w-full py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px]">${t('add_bot')}</button>
+                            <button onclick="startDraftSetup()" class="w-full py-4 bg-amber-500 text-black rounded-2xl font-black uppercase text-xs mt-2 transition-all active:scale-95 shadow-lg shadow-amber-500/20 disabled:opacity-20 disabled:pointer-events-none" ${!canStart ? 'disabled' : ''}>${t('start_btn')}</button>
+                            ${!canStart ? `<p class="text-[7px] font-black text-red-500 uppercase text-center animate-pulse">${t('need_players_warning')}</p>` : ''}
+                        ` : `<div class="py-4 text-center"><p class="text-[10px] font-black text-amber-500/60 uppercase">${t('host_label')} ${hostName}</p><p class="text-[8px] font-black text-slate-600 animate-pulse uppercase mt-1">${t('waiting_for_start')}</p></div>`}
                     </div>
                 </div>
             </div>`;
@@ -1328,7 +1600,7 @@
             const rPlayers = playersArr.filter(p => p.team === 'Radiant').length;
             const dPlayers = playersArr.filter(p => p.team === 'Dire').length;
             const totalPlayers = rPlayers + dPlayers;
-            const totalBans = roomData.bansRadiant + roomData.bansDire;
+            const totalBans = (roomData.bansRadiant || 0) + (roomData.bansDire || 0);
             const totalPool = roomData.nValues.reduce((a, b) => a + b, 0);
             const neededHeroes = totalPlayers + totalBans;
             const isValid = totalPool >= neededHeroes && rPlayers > 0 && dPlayers > 0;
@@ -1342,7 +1614,7 @@
                 <div class="relative flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/5 mb-8 gap-6">
                     <div class="flex items-center gap-6">
                         ${host ? `<button onclick="cancelSetupAction()" class="p-4 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition-all flex items-center justify-center group shadow-xl active:scale-95" title="Вернуться в лобби"><i data-lucide="arrow-left" class="w-6 h-6 transition-transform group-hover:-translate-x-1"></i></button>` : ''}
-                        <h2 class="text-4xl font-black italic uppercase tracking-tighter">Draft Configuration</h2>
+                        <h2 class="text-4xl font-black italic uppercase tracking-tighter">${t('draft_config')}</h2>
                     </div>
                     <div class="flex items-center gap-6 bg-black/40 px-6 py-3 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
                         <div class="flex flex-col items-end justify-center"><p class="text-[10px] font-black text-green-500 uppercase leading-none tracking-widest mb-1.5">Radiant</p><p class="text-3xl font-black italic leading-none text-white">${rPlayers}</p></div>
@@ -1353,32 +1625,32 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div class="space-y-6">
                         <div class="p-6 bg-white/5 rounded-[2rem] border border-white/5 space-y-6">
-                            <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2 text-center">Hero Pool Rows</h3>
-                            <div class="grid grid-cols-5 gap-2 pb-2">${POS_LABELS.map((label, i) => `<div class="bg-white/5 p-3 rounded-2xl"><p class="text-[8px] font-black text-slate-500 mb-2 uppercase text-center leading-none h-8 flex flex-col items-center justify-center"><span>${label}</span><span class="text-amber-500/50 pt-1">TOTAL: ${posCounts[i]}</span></p><div class="flex items-center justify-between"><button onclick="updateNValue(${i}, ${Math.max(1, roomData.nValues[i] - 1)})" class="w-6 h-6 rounded-lg bg-black text-xs ${!host ? 'opacity-20 pointer-events-none' : ''} transition-all" ${!host ? 'disabled' : ''}>-</button><span class="font-black text-xs">${roomData.nValues[i]}</span><button onclick="updateNValue(${i}, ${roomData.nValues[i] + 1})" class="w-6 h-6 rounded-lg bg-black text-xs ${!host ? 'opacity-20 pointer-events-none' : ''} transition-all" ${!host ? 'disabled' : ''}>+</button></div></div>`).join('')}</div>
+                            <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2 text-center">${t('hero_pool_rows')}</h3>
+                            <div class="grid grid-cols-5 gap-2 pb-2">${POS_LABELS.map((label, i) => `<div class="bg-white/5 p-3 rounded-2xl"><p class="text-[8px] font-black text-slate-500 mb-2 uppercase text-center leading-none h-8 flex flex-col items-center justify-center"><span>${label}</span><span class="text-amber-500/50 pt-1">${t('total_label')}: ${posCounts[i]}</span></p><div class="flex items-center justify-between"><button onclick="updateNValue(${i}, ${Math.max(1, roomData.nValues[i] - 1)})" class="w-6 h-6 rounded-lg bg-black text-xs ${!host ? 'opacity-20 pointer-events-none' : ''} transition-all" ${!host ? 'disabled' : ''}>-</button><span class="font-black text-xs">${roomData.nValues[i]}</span><button onclick="updateNValue(${i}, ${roomData.nValues[i] + 1})" class="w-6 h-6 rounded-lg bg-black text-xs ${!host ? 'opacity-20 pointer-events-none' : ''} transition-all" ${!host ? 'disabled' : ''}>+</button></div></div>`).join('')}</div>
                             
                             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                                 <div>
-                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 text-center">Pick Timer (sec)</h3>
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 text-center">${t('pick_timer')}</h3>
                                     <div class="flex items-center justify-center gap-3">
                                         <input type="number" value="${roomData.pickDuration}" onchange="updateField('pickDuration', parseInt(this.value))" class="bg-black/50 border border-white/10 rounded-xl p-2 w-20 text-center font-black ${!host ? 'opacity-50 pointer-events-none' : ''}" ${roomData.infinitePickTime || !host ? 'disabled' : ''}>
                                         <label onclick="${host ? '' : 'event.preventDefault()'}" class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-xl border-2 transition-all ${roomData.infinitePickTime ? 'border-amber-500/50 bg-amber-500/10' : 'border-white/5 opacity-40'} ${!host ? 'pointer-events-none' : ''}">
                                             <input type="checkbox" ${roomData.infinitePickTime ? 'checked' : ''} onchange="updateField('infinitePickTime', this.checked)" class="w-4 h-4 accent-amber-500" ${!host ? 'disabled' : ''}>
-                                            <span class="text-[9px] font-black uppercase ${roomData.infinitePickTime ? 'text-amber-500' : 'text-slate-500'}">No Limit</span>
+                                            <span class="text-[9px] font-black uppercase ${roomData.infinitePickTime ? 'text-amber-500' : 'text-slate-500'}">${t('no_limit')}</span>
                                         </label>
                                     </div>
                                 </div>
                                 <div class="flex flex-col items-center">
-                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 text-center">Ban Timer (sec)</h3>
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 text-center">${t('ban_timer')}</h3>
                                     <div class="flex items-center justify-center gap-3">
                                         <input type="number" value="${roomData.banDuration}" onchange="updateField('banDuration', parseInt(this.value))" class="bg-black/50 border border-white/10 rounded-xl p-2 w-16 text-center font-black ${!host ? 'opacity-50 pointer-events-none' : ''}" ${roomData.infiniteBanTime || !host ? 'disabled' : ''}>
                                         <label onclick="${host ? '' : 'event.preventDefault()'}" class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-xl border-2 transition-all ${roomData.infiniteBanTime ? 'border-amber-500/50 bg-amber-500/10' : 'border-white/5 opacity-40'} ${!host ? 'pointer-events-none' : ''}">
                                             <input type="checkbox" ${roomData.infiniteBanTime ? 'checked' : ''} onchange="updateField('infiniteBanTime', this.checked)" class="w-4 h-4 accent-amber-500" ${!host ? 'disabled' : ''}>
-                                            <span class="text-[8px] font-black uppercase ${roomData.infiniteBanTime ? 'text-amber-500' : 'text-slate-500'}">No Limit</span>
+                                            <span class="text-[8px] font-black uppercase ${roomData.infiniteBanTime ? 'text-amber-500' : 'text-slate-500'}">${t('no_limit')}</span>
                                         </label>
                                     </div>
                                 </div>
                                 <div class="flex flex-col items-center">
-                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2">Bans Setting</h3>
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2">${t('bans_setting')}</h3>
                                     <div class="flex items-center gap-3">
                                         <div class="flex flex-col items-center">
                                             <span class="text-[7px] font-black text-green-500 uppercase mb-1">Radiant</span>
@@ -1395,13 +1667,13 @@
 
                             <div class="p-4 rounded-2xl ${isValid ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'} flex items-center justify-between border ${isValid ? 'border-green-500/20' : 'border-red-500/20'}">
                                 <div class="text-[10px] font-black uppercase">
-                                    ${isValid ? 'Pool size is sufficient' : `Warning: Need ${neededHeroes} heroes, have ${totalPool}`}
+                                    ${isValid ? t('pool_size_ok') : t('pool_size_warning', { needed: neededHeroes, total: totalPool })}
                                 </div>
                                 <div class="text-xs font-black">${totalPool} / ${neededHeroes}</div>
                             </div>
                         </div>
 
-                        <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2 mt-8">Pick Strategy</h3>
+                        <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2 mt-8">${t('pick_strategy')}</h3>
                         <div class="space-y-3">${strats.map((s, i) => `
                             <div onclick="updateField('strategyIdx', ${i})" class="strategy-option p-4 rounded-2xl bg-white/5 flex items-center justify-between ${roomData.strategyIdx === i ? 'active' : ''} ${!host ? 'opacity-50 pointer-events-none' : ''}">
                                 <span class="font-black uppercase text-xs">${s.name}</span>
@@ -1413,14 +1685,14 @@
                         <div class="grid grid-cols-1 md:grid-cols-[1.5fr_0.8fr_0.8fr] gap-6">
                             <div class="space-y-3">
                                 <div class="flex flex-col gap-3">
-                                    <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">Active Heroes</h3>
-                                    ${host ? `<input id="hero-search-input" type="text" placeholder="Search hero..." value="${window.heroSearchQuery}" oninput="window.heroSearchQuery = this.value; window.render();" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase focus:border-amber-500 outline-none transition-all placeholder:opacity-30 shadow-inner">` : ''}
+                                    <h3 class="text-[10px] font-black uppercase text-slate-500 border-b border-white/5 pb-2">${t('active_heroes')}</h3>
+                                    ${host ? `<input id="hero-search-input" type="text" placeholder="${t('search_hero_placeholder')}" value="${window.heroSearchQuery}" oninput="window.heroSearchQuery = this.value; window.render();" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase focus:border-amber-500 outline-none transition-all placeholder:opacity-30 shadow-inner">` : ''}
                                 </div>
                                 <div id="hero-tag-manager" class="bg-white/5 rounded-[2rem] border border-white/5 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-3 gap-3">
                                         ${HEROES.filter(h => !excludedSet.has(h.id) && !vipSet.has(h.id) && h.name.toLowerCase().includes((window.heroSearchQuery || "").toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                                            const hPos = getHeroPositions(h.id);
-                                            return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
+                const hPos = getHeroPositions(h.id);
+                return `<div class="p-2 rounded-xl bg-black/40 group flex flex-col items-center gap-2" draggable="false">
                                                 <div class="relative w-full aspect-[3/4] rounded-lg overflow-hidden border-2 border-white/5 group-hover:border-white/30 transition-all">
                                                     ${getHeroImg(h)}
                                                     ${host ? `
@@ -1431,33 +1703,33 @@
                                                 </div>
                                                 <div class="flex gap-0.5">${[1, 2, 3, 4, 5].map(p => `<span onclick="toggleHeroPosition(${h.id}, ${p})" class="role-tag ${hPos.includes(p) ? 'active' : 'inactive'} text-[6px]">${p}</span>`).join('')}</div>
                                             </div>`;
-                                        }).join('')}
+            }).join('')}
                                     </div>
                                 </div>
                             </div>
                             <div class="space-y-3">
-                                <h3 class="text-[10px] font-black uppercase text-amber-500 border-b border-white/5 pb-2">VIP List</h3>
+                                <h3 class="text-[10px] font-black uppercase text-amber-500 border-b border-white/5 pb-2">${t('vip_list')}</h3>
                                 <div id="hero-vip-list" class="bg-amber-500/5 rounded-[2rem] border border-amber-500/10 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-1 gap-3">
                                         ${HEROES.filter(h => vipSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                                            return `<div onclick="toggleVipHero(${h.id})" class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-amber-500/20 transition-all" draggable="false">
+                return `<div onclick="toggleVipHero(${h.id})" class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-amber-500/20 transition-all" draggable="false">
                                                 <div class="w-full aspect-[3/4] rounded-lg overflow-hidden group-hover:scale-105 transition-all">${getHeroImg(h)}</div>
                                                 <span class="text-[8px] font-black uppercase text-amber-500 truncate w-full text-center">${h.name}</span>
                                             </div>`;
-                                        }).join('')}
+            }).join('')}
                                     </div>
                                 </div>
                             </div>
                             <div class="space-y-3">
-                                <h3 class="text-[10px] font-black uppercase text-red-500 border-b border-white/5 pb-2">Ban List</h3>
+                                <h3 class="text-[10px] font-black uppercase text-red-500 border-b border-white/5 pb-2">${t('ban_list')}</h3>
                                 <div id="hero-ban-list" class="bg-red-500/5 rounded-[2rem] border border-red-500/10 h-[640px] overflow-y-auto p-4 scrollbar-custom">
                                     <div class="grid grid-cols-1 gap-3">
                                         ${HEROES.filter(h => excludedSet.has(h.id)).sort((a, b) => a.name.localeCompare(b.name)).map(h => {
-                                            return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
+                return `<div onclick="toggleExcludeHero(${h.id})" class="p-2 rounded-xl bg-red-600/10 border border-red-600/20 group flex flex-col items-center gap-2 cursor-pointer hover:bg-red-600/20 transition-all" draggable="false">
                                                 <div class="w-full aspect-[3/4] rounded-lg overflow-hidden grayscale opacity-50 group-hover:opacity-100 group-hover:grayscale-0 transition-all">${getHeroImg(h)}</div>
                                                 <span class="text-[8px] font-black uppercase text-red-500 truncate w-full text-center">${h.name}</span>
                                             </div>`;
-                                        }).join('')}
+            }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -1465,7 +1737,7 @@
                     </div>
                 </div>
                 <div class="text-center pt-8">
-                    ${host ? `<button onclick="startDraftAction()" class="px-20 py-5 bg-green-500 text-black rounded-3xl font-black uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" ${!isValid ? 'disabled' : ''}>Generate Heroes List</button>` : `<p class="animate-pulse font-black text-slate-500 uppercase">Wait for host...</p>`}
+                    ${host ? `<button onclick="startDraftAction()" class="px-20 py-5 bg-green-500 text-black rounded-3xl font-black uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" ${!isValid ? 'disabled' : ''}>${t('generate_heroes_btn')}</button>` : `<p class="animate-pulse font-black text-slate-500 uppercase">${t('wait_for_host')}</p>`}
                 </div>
             </div>`;
             lucide.createIcons();
@@ -1511,7 +1783,7 @@
                             ${isRandom ? '<div class="absolute bottom-0 left-0 right-0 bg-amber-500 text-black text-[8px] font-black uppercase py-1 text-center shadow-lg whitespace-nowrap z-30">🎲 RANDOM</div>' : ''}
                         </div>
                         <div class="flex-1 text-left">
-                            <h4 class="text-2xl font-black italic uppercase mb-2 ${teamName === 'Radiant' ? 'text-green-500' : 'text-red-500'} leading-none">${h ? h.name : 'Bot / Empty'}</h4>
+                            <h4 class="text-2xl font-black italic uppercase mb-2 ${teamName === 'Radiant' ? 'text-green-500' : 'text-red-500'} leading-none">${h ? h.name : t('bot_empty')}</h4>
                             <div class="flex items-center gap-3">
                                 ${p ? `<img src="${p.photo}" class="w-8 h-8 rounded-full border border-white/20"><span class="text-sm font-bold uppercase text-slate-400 leading-none">${p.name}</span>` : ''}
                             </div>
@@ -1552,27 +1824,27 @@
 
             if (isR) {
                 c.innerHTML = `<div class="space-y-6 animate-in slide-in-from-bottom duration-1000">
-                    <div class="text-center"><div class="text-amber-500 font-black text-5xl italic animate-pulse uppercase tracking-tighter">BATTLE START</div></div>
+                    <div class="text-center"><div class="text-amber-500 font-black text-5xl italic animate-pulse uppercase tracking-tighter">${t('battle_start')}</div></div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-                        <div><h3 class="text-xl font-black text-green-500 uppercase mb-3 text-center lg:text-left">Radiant</h3><div class="space-y-2">${renderHeroResultEntry('Radiant', roomData.teamSizeRadiant)}</div></div>
-                        <div><h3 class="text-xl font-black text-red-600 uppercase mb-3 text-center lg:text-right">Dire</h3><div class="space-y-2">${renderHeroResultEntry('Dire', roomData.teamSizeDire)}</div></div>
+                        <div><h3 class="text-xl font-black text-green-500 uppercase mb-3 text-center lg:text-left">${t('radiant')}</h3><div class="space-y-2">${renderHeroResultEntry('Radiant', roomData.teamSizeRadiant)}</div></div>
+                        <div><h3 class="text-xl font-black text-red-600 uppercase mb-3 text-center lg:text-right">${t('dire')}</h3><div class="space-y-2">${renderHeroResultEntry('Dire', roomData.teamSizeDire)}</div></div>
                     </div>
                     ${(roomData.vipIds || []).length > 0 ? `
                     <div class="pt-6 border-t border-white/5">
-                        <h3 class="text-[9px] font-black text-amber-500 uppercase mb-4 tracking-widest text-center">VIP Heroes Status</h3>
+                        <h3 class="text-[9px] font-black text-amber-500 uppercase mb-4 tracking-widest text-center">${t('vip_status')}</h3>
                         <div class="flex flex-wrap items-center justify-center gap-4 pb-4 px-4">
                             ${(roomData.vipIds || []).map(id => {
-                                const h = getHeroById(id);
-                                const isPick = Object.values(roomData.picksRadiant || {}).includes(id) || Object.values(roomData.picksDire || {}).includes(id);
-                                return `<div class="w-12 h-16 rounded-xl border-2 ${isPick ? 'border-transparent hero-picked-fx' : 'border-amber-500/30'} overflow-hidden shadow-lg relative shrink-0">
+                    const h = getHeroById(id);
+                    const isPick = Object.values(roomData.picksRadiant || {}).includes(id) || Object.values(roomData.picksDire || {}).includes(id);
+                    return `<div class="w-12 h-16 rounded-xl border-2 ${isPick ? 'border-transparent hero-picked-fx' : 'border-amber-500/30'} overflow-hidden shadow-lg relative shrink-0">
                                     ${getHeroImg(h)}
                                     ${!isPick ? '<div class="absolute inset-0 border-2 border-amber-500/20 rounded-xl pointer-events-none"></div>' : ''}
                                 </div>`;
-                            }).join('')}
+                }).join('')}
                         </div>
                     </div>` : ''}
                     <div class="pt-6 border-t border-white/5">
-                        <h3 class="text-[9px] font-black text-slate-600 uppercase mb-3 tracking-widest text-center">Banned Heroes</h3>
+                        <h3 class="text-[9px] font-black text-slate-600 uppercase mb-3 tracking-widest text-center">${t('banned_heroes_label')}</h3>
                         <div class="flex gap-4 justify-center items-center bg-black/30 p-3 rounded-2xl max-w-xl mx-auto border border-white/5">
                             <div class="flex flex-wrap gap-1 justify-end">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="w-10 h-14 rounded-md overflow-hidden grayscale border-2 border-green-500/30 opacity-70">${getHeroImg(getHeroById(Object.values(roomData.bans || {}).filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div>
                             <div class="w-px h-10 bg-white/10 shrink-0"></div>
@@ -1580,7 +1852,7 @@
                         </div>
                     </div>
                     <div class="pt-6 border-t border-white/5">
-                        <h3 class="text-[9px] font-black text-slate-600 uppercase mb-4 tracking-widest text-center">Remaining Hero Pool</h3>
+                        <h3 class="text-[9px] font-black text-slate-600 uppercase mb-4 tracking-widest text-center">${t('remaining_pool_label')}</h3>
                         <div class="flex flex-wrap items-center justify-center gap-3 pb-6 px-4">${sortedPool.filter(h => {
                     const bans = Object.values(roomData.bans || {});
                     const pR = Object.values(roomData.picksRadiant || {});
@@ -1588,7 +1860,7 @@
                     return !bans.find(b => b.i === h.id) && !pR.includes(h.id) && !pD.includes(h.id);
                 }).map(h => `<div class="w-12 h-16 rounded-xl border-2 border-white/10 overflow-hidden grayscale opacity-20 transition-all hover:opacity-100 hover:grayscale-0">${getHeroImg(h)}</div>`).join('')}</div>
                     </div>
-                    <div class="flex justify-center pb-8">${isAdmin() ? `<button onclick="startOverAction()" class="px-10 py-3 bg-red-600 text-white rounded-xl font-black uppercase shadow-2xl hover:bg-red-500 transition-all active:scale-95 text-xs">Reset Draft</button>` : ''}</div>
+                    <div class="flex justify-center pb-8">${isAdmin() ? `<button onclick="startOverAction()" class="px-10 py-3 bg-red-600 text-white rounded-xl font-black uppercase shadow-2xl hover:bg-red-500 transition-all active:scale-95 text-xs">${t('reset_draft')}</button>` : ''}</div>
                 </div>`;
             } else {
                 c.innerHTML = `<div class="space-y-6">
@@ -1607,15 +1879,15 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start"><div class="team-card p-8 rounded-[3rem] border-4 transition-all duration-700 ${roomData.currentTurnTeam === 'Radiant' ? 'border-green-500' : 'border-transparent'}"><h3 class="text-2xl font-black text-green-500 mb-6 italic uppercase text-center">RADIANT</h3><div class="grid grid-cols-5 gap-3">${renderSlots('Radiant', roomData.picksRadiant, roomData.teamSizeRadiant)}</div></div>
                         <div class="bg-[#1a1d26] p-8 rounded-[3rem] border-2 border-white/10 text-center shadow-2xl flex flex-col justify-center min-h-[380px] relative overflow-hidden">
                             <div class="absolute top-8 left-1/2 -translate-x-1/2 w-20 h-20">
-                                ${isF ? `<i data-lucide="loader-2" class="w-full h-full text-amber-500 animate-spin"></i><div class="absolute inset-0 flex items-center justify-center text-[10px] font-black italic text-amber-500">INIT</div>`
+                                ${isF ? `<i data-lucide="loader-2" class="w-full h-full text-amber-500 animate-spin"></i><div class="absolute inset-0 flex items-center justify-center text-[10px] font-black italic text-amber-500">${t('init')}</div>`
                         : `<svg class="w-full h-full -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle><circle id="timer-progress" cx="50" cy="50" r="45" fill="none" stroke="${roomData.currentTurnTeam === 'Radiant' ? '#22c55e' : '#ef4444'}" stroke-width="8" stroke-dasharray="283" class="timer-circle" style="stroke-dashoffset: ${dashOffset}"></circle></svg><div id="turn-timer-text" class="absolute inset-0 flex items-center justify-center text-3xl font-black italic">${currentTimerText}</div>`}
                             </div>
                             <div class="mt-28 flex flex-col items-center">
-                                <div class="text-4xl font-black italic tracking-tight ${isF ? 'text-amber-500' : (isB ? 'text-red-500' : 'text-white')} uppercase leading-none">${isF ? 'POOL GEN' : (isB ? 'BAN' : 'PICK')}</div>
-                                <div class="text-xl font-black mt-1 tracking-widest ${isF ? 'text-amber-500 animate-pulse' : (roomData.currentTurnTeam === 'Radiant' ? 'text-green-500' : 'text-red-600')} uppercase">${isF ? 'FORMING...' : roomData.currentTurnTeam}</div>
+                                <div class="text-4xl font-black italic tracking-tight ${isF ? 'text-amber-500' : (isB ? 'text-red-500' : 'text-white')} uppercase leading-none">${isF ? t('pool_gen') : (isB ? t('ban_label') : t('pick_label'))}</div>
+                                <div class="text-xl font-black mt-1 tracking-widest ${isF ? 'text-amber-500 animate-pulse' : (roomData.currentTurnTeam === 'Radiant' ? 'text-green-500' : 'text-red-600')} uppercase">${isF ? t('forming') : t(roomData.currentTurnTeam.toLowerCase())}</div>
                                 <div class="h-10 mt-2 flex flex-col items-center justify-center">
-                                    ${isMyAction ? '<p class="text-amber-500 font-black uppercase text-xl italic animate-bounce tracking-widest leading-none">YOUR TURN!</p>' : ''}
-                                    ${roomData.isExtraTime ? '<p class="text-[10px] text-amber-500 font-black uppercase animate-pulse border-2 border-amber-500/30 px-2 py-0.5 rounded-lg bg-amber-500/10 leading-none">EXTRA TIME!</p>' : ''}
+                                    ${isMyAction ? `<p class="text-amber-500 font-black uppercase text-xl italic animate-bounce tracking-widest leading-none">${t('your_turn')}</p>` : ''}
+                                    ${roomData.isExtraTime ? `<p class="text-[10px] text-amber-500 font-black uppercase animate-pulse border-2 border-amber-500/30 px-2 py-0.5 rounded-lg bg-amber-500/10 leading-none">${t('extra_time')}</p>` : ''}
                                 </div>
                             </div>
                             <div class="mt-4 flex flex-col items-center gap-4 px-4 w-full relative">
@@ -1626,13 +1898,13 @@
 
                                 <div class="flex items-center gap-2">
                                     ${!isB && turnP && (turnP.uid === localUser.uid || (isAdmin() && turnP.uid.startsWith('bot'))) ? `
-                                    <button onclick="confirmPickAction()" class="px-8 py-4 bg-white text-black rounded-2xl font-black uppercase text-xs hover:bg-slate-200 transition-all ${!roomData.pendingHeroId ? 'opacity-20 pointer-events-none' : 'shadow-xl active:scale-95'}">CONFIRM</button>
+                                    <button onclick="confirmPickAction()" class="px-8 py-4 bg-white text-black rounded-2xl font-black uppercase text-xs hover:bg-slate-200 transition-all ${!roomData.pendingHeroId ? 'opacity-20 pointer-events-none' : 'shadow-xl active:scale-95'}">${t('confirm_btn')}</button>
                                     <button onclick="randomPickAction()" class="p-4 bg-white/5 border border-white/10 rounded-2xl text-slate-500 hover:text-white transition-all"><i data-lucide="shuffle" class="w-5 h-5"></i></button>
                                     ` : ''}
                                     <button onclick="toggleEmojiPicker()" class="p-4 bg-amber-500 text-black rounded-2xl hover:bg-amber-400 transition-all shadow-lg active:scale-95 flex items-center justify-center"><i data-lucide="smile" class="w-5 h-5"></i></button>
                                 </div>
                                 <div class="w-full">
-                                    <p class="text-[9px] font-black uppercase text-slate-600 mb-2 tracking-widest text-center">${isB ? 'Progress' : 'Banned Heroes'}</p>
+                                    <p class="text-[9px] font-black uppercase text-slate-600 mb-2 tracking-widest text-center">${isB ? t('progress') : t('banned_heroes_label')}</p>
                                     <div class="flex gap-2 justify-center items-center">
                                         <div class="flex gap-1">${[...Array(roomData.bansRadiant)].map((_, i) => `<div class="ban-quota-slot border-green-500/20">${getHeroImg(getHeroById(Object.values(roomData.bans || {}).filter(x => x.t === 'Radiant')[i]?.i))}</div>`).join('')}</div>
                                         <div class="w-px h-8 bg-white/5 shrink-0"></div>
@@ -1645,8 +1917,8 @@
 
                         <div class="flex items-center justify-between mb-8 px-4 border-b border-white/5 pb-6">
                             <div class="flex flex-col gap-1">
-                                <h4 class="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none">Team Voting Status</h4>
-                                <p class="text-[8px] font-bold text-slate-600 uppercase tracking-[0.2em] leading-none">Who are we waiting for?</p>
+                                <h4 class="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none">${t('team_voting_status')}</h4>
+                                <p class="text-[8px] font-bold text-slate-600 uppercase tracking-[0.2em] leading-none">${t('waiting_for_who')}</p>
                             </div>
                             <div class="flex items-center gap-3">
                                 ${myT === roomData.currentTurnTeam ? playersArr.filter(p => p.team === roomData.currentTurnTeam).sort((a, b) => a.slot - b.slot).map(p => {
@@ -1661,77 +1933,91 @@
                         }).join('') : (() => {
                             const tP = playersArr.filter(p => p.team === roomData.currentTurnTeam);
                             const vC = tP.filter(p => roomData.votes[p.uid]).length;
-                            return `<div class="bg-black/40 px-6 py-3 rounded-xl border border-white/5 flex items-center gap-3"><div class="w-3 h-3 rounded-full ${vC === tP.length && tP.length > 0 ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}"></div><span class="text-[10px] font-black uppercase tracking-widest ${vC === tP.length && tP.length > 0 ? 'text-green-500' : 'text-amber-500'}">${vC} / ${tP.length} VOTES SUBMITTED</span></div>`;
+                            return `<div class="bg-black/40 px-6 py-3 rounded-xl border border-white/5 flex items-center gap-3"><div class="w-3 h-3 rounded-full ${vC === tP.length && tP.length > 0 ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}"></div><span class="text-[10px] font-black uppercase tracking-widest ${vC === tP.length && tP.length > 0 ? 'text-green-500' : 'text-amber-500'}">${vC} / ${tP.length} ${t('votes_submitted')}</span></div>`;
                         })()}
                             </div>
                         </div>
                         <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-x-6 gap-y-10">
                             ${(() => {
-                                const hydVips = (roomData.vipIds || []).map(id => getHeroById(id)).filter(Boolean);
-                                const sortedVips = [...hydVips].sort((a, b) => a.name.localeCompare(b.name));
-                                if (sortedVips.length === 0) return '';
-                                return `
+                        const hydVips = (roomData.vipIds || []).map(id => getHeroById(id)).filter(Boolean);
+                        const sortedVips = [...hydVips].sort((a, b) => a.name.localeCompare(b.name));
+                        if (sortedVips.length === 0) return '';
+                        return `
                                 <div class="col-span-full mb-8 pb-8 border-b border-white/5 px-4 w-full">
                                     <h3 class="text-[10px] font-black uppercase text-amber-500 mb-6 tracking-[0.3em] flex items-center justify-center gap-4">
                                         <span class="w-12 h-px bg-amber-500/20"></span>
-                                        VIP HERO LIST
+                                        ${t('vip_hero_list')}
                                         <span class="w-12 h-px bg-amber-500/20"></span>
                                     </h3>
                                     <div class="flex flex-wrap items-center justify-center gap-6">
                                         ${sortedVips.map(h => {
-                                            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
-                                            const picksDireArr = Object.values(roomData.picksDire || {});
-                                            const isPick = picksRadiantArr.includes(h.id) || picksDireArr.includes(h.id);
-                                            const pend = roomData.pendingHeroId === h.id;
-                                            return `<div onclick="${!isPick ? `handleHeroClick(${h.id})` : ''}" class="group flex flex-col items-center gap-2 ${!isPick ? 'cursor-pointer' : ''} transition-all">
+                            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
+                            const picksDireArr = Object.values(roomData.picksDire || {});
+                            const isPick = picksRadiantArr.includes(h.id) || picksDireArr.includes(h.id);
+                            const pend = roomData.pendingHeroId === h.id;
+                            return `<div onclick="${!isPick ? `handleHeroClick(${h.id})` : ''}" class="group flex flex-col items-center gap-2 ${!isPick ? 'cursor-pointer' : ''} transition-all">
                                                 <div class="hero-img-container w-20 h-28 rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (isPick ? 'border-transparent' : 'border-amber-500/30')} ${isPick ? 'hero-picked-fx' : ''} shadow-xl group-hover:border-amber-500 transition-all">
                                                     ${getHeroImg(h)}
-                                                    ${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none transition-all"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-2 rounded-lg shadow-lg">PICK</span></div>` : ''}
+                                                    ${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none transition-all"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-2 rounded-lg shadow-lg">${t('pick_label')}</span></div>` : ''}
                                                     ${!isPick ? `<div class="absolute top-1 right-1 bg-amber-500 text-black text-[6px] font-black px-1 rounded shadow-lg opacity-80 group-hover:opacity-100">VIP</div>` : ''}
                                                 </div>
                                                 <span class="text-[8px] font-black uppercase ${isPick ? 'text-slate-800' : 'text-amber-500'} group-hover:text-white truncate max-w-[80px] text-center">${h.name}</span>
                                             </div>`;
-                                        }).join('')}
+                        }).join('')}
                                     </div>
                                 </div>`;
-                            })()}
+                    })()}
                             ${sortedPool.map((h, idx) => {
-                            const isBan = Object.values(roomData.bans || {}).find(x => x.i === h.id);
-                            const picksRadiantArr = Object.values(roomData.picksRadiant || {});
-                            const picksDireArr = Object.values(roomData.picksDire || {});
-                            const isPick = picksRadiantArr.includes(h.id) || picksDireArr.includes(h.id);
-                            const activeTeamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
-                            const canSeeVotes = myT === roomData.currentTurnTeam;
-                            const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
-                            const bSize = 8 + (vCount * 4);
-                            const myV = roomData.votes[localUser.uid] === h.id, teamV = canSeeVotes ? playersArr.filter(p => p.team === roomData.currentTurnTeam && roomData.votes[p.uid] === h.id) : [];
-                            const pend = roomData.pendingHeroId === h.id;
-                            const anim = isF, del = sortedPool.length > 0 ? (7 / sortedPool.length) : 0;
-                            return `<div ${!isF ? `onclick="handleHeroClick(${h.id})"` : ''} class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 ${!isF ? 'cursor-pointer' : ''}" style="${anim ? `animation-delay: ${idx * del}s; animation-fill-mode: both;` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && vCount > 0 ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan ? 'hero-banned-fx' : isPick ? 'hero-picked-fx' : ''}">
-                            ${getHeroImg(h)}${isB && vCount > 0 ? `<div class="absolute inset-0 bg-red-600/10 flex items-center justify-center pointer-events-none"><span class="text-white font-black uppercase bg-red-600 px-1.5 rounded -rotate-12 shadow-lg" style="font-size: ${bSize}px">BAN</span></div>` : ''}${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-1.5 rounded">PICK</span></div>` : ''}
+                        const isBan = Object.values(roomData.bans || {}).find(x => x.i === h.id);
+                        const picksRadiantArr = Object.values(roomData.picksRadiant || {});
+                        const picksDireArr = Object.values(roomData.picksDire || {});
+                        const isPick = picksRadiantArr.includes(h.id) || picksDireArr.includes(h.id);
+                        const activeTeamMembers = playersArr.filter(p => p.team === roomData.currentTurnTeam);
+                        const canSeeVotes = myT === roomData.currentTurnTeam;
+                        const vCount = activeTeamMembers.filter(p => roomData.votes[p.uid] === h.id).length;
+                        const bSize = 8 + (vCount * 4);
+                        const myV = roomData.votes[localUser.uid] === h.id, teamV = canSeeVotes ? playersArr.filter(p => p.team === roomData.currentTurnTeam && roomData.votes[p.uid] === h.id) : [];
+                        const pend = roomData.pendingHeroId === h.id;
+                        const anim = isF, del = sortedPool.length > 0 ? (7 / sortedPool.length) : 0;
+                        return `<div ${!isF ? `onclick="handleHeroClick(${h.id})"` : ''} class="${anim ? 'animate-hero' : 'opacity-100'} group flex flex-col items-center gap-2 ${!isF ? 'cursor-pointer' : ''}" style="${anim ? `animation-delay: ${idx * del}s; animation-fill-mode: both;` : ''}"><div class="hero-img-container rounded-2xl border-2 ${pend ? 'pending-pick-glow scale-105' : (myV ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : (isB && vCount > 0 ? 'pending-ban-glow' : (!isBan && !isPick ? 'border-slate-800' : 'border-transparent')))} ${isBan ? 'hero-banned-fx' : isPick ? 'hero-picked-fx' : ''}">
+                            ${getHeroImg(h)}${isB && vCount > 0 ? `<div class="absolute inset-0 bg-red-600/10 flex items-center justify-center pointer-events-none"><span class="text-white font-black uppercase bg-red-600 px-1.5 rounded -rotate-12 shadow-lg" style="font-size: ${bSize}px">${t('ban_label')}</span></div>` : ''}${pend ? `<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center animate-pulse pointer-events-none"><span class="text-black font-black text-[9px] uppercase bg-amber-500 px-1.5 rounded">${t('pick_label')}</span></div>` : ''}
                             <div class="absolute top-1 right-1 flex flex-wrap-reverse gap-0.5 justify-end">${teamV.map(v => `<img src="${v.photo}" class="w-4 h-4 rounded-sm border border-white/50 bg-black shadow-md">`).join('')}</div></div><span class="text-[8px] font-black uppercase text-slate-600 group-hover:text-white truncate w-full text-center">${h.name}</span></div>`;
-                        }).join('')}</div></div></div>`;
+                    }).join('')}</div></div></div>`;
                 lucide.createIcons();
             }
         };
 
         const renderHeader = () => {
             const roomDisp = document.getElementById('room-display'), ctrls = document.getElementById('header-controls');
-            if (roomDisp) roomDisp.textContent = roomData.id ? `ROOM: ${roomData.id} • ${roomData.stage.toUpperCase()}` : 'DOTA DRAFTER';
+            if (roomDisp) roomDisp.textContent = roomData.id ? `${t('room')}: ${roomData.id} • ${t(roomData.stage).toUpperCase()}` : 'DOTA DRAFTER';
 
             const sfxIcon = SoundManager.isMuted ? 'volume-x' : 'volume-2';
             const sfxBtn = `<button onclick="SoundManager.toggleMute()" class="text-slate-500 hover:text-white transition-all flex items-center justify-center p-2" title="Toggle SFX"><i data-lucide="${sfxIcon}" class="w-4 h-4"></i></button>`;
 
+            const langSwitcher = `
+                      <div class="relative lang-dropdown-container">
+                          <button onclick="window.toggleLangDropdown(event)" class="text-slate-500 hover:text-white transition-all flex items-center justify-center gap-1.5 p-2 px-3 bg-white/5 rounded-xl border border-white/5 text-[10px] font-black uppercase">
+                              <i data-lucide="languages" class="w-3.5 h-3.5"></i>
+                              ${window.currentLanguage}
+                          </button>
+                          <div class="absolute top-full right-0 mt-2 bg-[#1a1d24] border border-white/10 rounded-xl shadow-2xl p-1 z-[100] transition-all ${window.langDropdownOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'} min-w-[100px]">
+                              <button onclick="window.setLanguage('en')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${window.currentLanguage === 'en' ? 'text-amber-500' : 'text-slate-400'}">English ${window.currentLanguage === 'en' ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                              <button onclick="window.setLanguage('ru')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${window.currentLanguage === 'ru' ? 'text-amber-500' : 'text-slate-400'}">Русский ${window.currentLanguage === 'ru' ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                              <button onclick="window.setLanguage('ykt')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${window.currentLanguage === 'ykt' ? 'text-amber-500' : 'text-slate-400'}">Саха ${window.currentLanguage === 'ykt' ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                          </div>
+                      </div>`;
+
             const controlsHtml = `
-                <div class="flex items-center gap-1 bg-white/5 py-1 px-2 rounded-2xl border border-white/5">
-                    ${sfxBtn}
-                    ${localUser.uid ? `
-                        <div class="w-px h-4 bg-white/10 mx-1"></div>
-                        <img src="${localUser.photo}" class="w-6 h-6 rounded border border-white/10">
-                        <span class="text-[10px] font-black uppercase hidden sm:block">${localUser.name}</span>
-                        <button onclick="logoutAction()" class="text-slate-500 hover:text-white p-2"><i data-lucide="log-out" class="w-4 h-4"></i></button>
-                    ` : ''}
-                </div>`;
+                 <div class="flex items-center gap-1 bg-white/5 py-1 px-2 rounded-2xl border border-white/5">
+                      ${langSwitcher}
+                     ${sfxBtn}
+                     ${localUser.uid ? `
+                         <div class="w-px h-4 bg-white/10 mx-1"></div>
+                         <img src="${localUser.photo}" class="w-6 h-6 rounded border border-white/10">
+                         <span class="text-[10px] font-black uppercase hidden sm:block">${localUser.name}</span>
+                         <button onclick="logoutAction()" class="text-slate-500 hover:text-white p-2" title="${t('logout')}"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+                     ` : ''}
+                 </div>`;
 
             if (ctrls) ctrls.innerHTML = controlsHtml;
             lucide.createIcons();
