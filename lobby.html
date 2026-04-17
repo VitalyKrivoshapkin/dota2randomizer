@@ -485,7 +485,11 @@
                 waiting_for_who: "Кими күүтэбит?",
                 vip_hero_list: "VIP ГЕРОЙДАР ИСПИИҺЭКТЭРЭ",
                 extra_time: "ЭБИИ БИРИЭМЭ!",
-                init: "ИНИТ"
+                init: "ИНИТ",
+                assign_bot_random: "Түбэспиччэ хамаандаҕа анаа (Radiant/Dire)",
+                back_to_lobby: "Лоббига төнүн",
+                cancel_draft_title: "Драфты тохтот уонна лоббига төнүн",
+                toggle_sfx: "Тыаһы холбоо/араар"
             },
             en: {
                 // Header & Entry
@@ -563,7 +567,11 @@
                 waiting_for_who: "Who are we waiting for?",
                 vip_hero_list: "VIP HERO LIST",
                 extra_time: "EXTRA TIME!",
-                init: "INIT"
+                init: "INIT",
+                assign_bot_random: "Assign to random team (Radiant/Dire)",
+                back_to_lobby: "Back to Lobby",
+                cancel_draft_title: "Cancel draft and back to lobby",
+                toggle_sfx: "Toggle SFX"
             }
         };
 
@@ -963,6 +971,14 @@
             { id: 126, name: "Kez", imgName: "kez", positions: [1, 2] }
         ];
 
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
         // Step 4: Hydrate a hero ID to full object
         function getHeroById(id) { return id ? HEROES.find(h => h.id === id) || null : null; }
         // Step 1: During setup reads local state; outside setup reads HEROES defaults
@@ -1224,7 +1240,7 @@
                 let playersObj = { ...data.players };
                 let pList = Object.values(playersObj);
                 let teamPlayers = pList.filter(p => p.team === 'Radiant' || p.team === 'Dire');
-                teamPlayers.sort(() => Math.random() - 0.5);
+                shuffleArray(teamPlayers);
                 let cR = 0, cD = 0;
                 const totalActive = teamPlayers.length;
                 const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
@@ -1324,8 +1340,8 @@
                     const pos = i + 1;
                     const excludedSet = new Set(data.excludedIds || []);
                     const vipSet = new Set(data.vipIds || []);
-                    HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excludedSet.has(h.id) && !vipSet.has(h.id))
-                        .sort(() => 0.5 - Math.random()).slice(0, n)
+                    shuffleArray(HEROES.filter(h => getHeroPositions(h.id).includes(pos) && !used.has(h.id) && !excludedSet.has(h.id) && !vipSet.has(h.id)))
+                        .slice(0, n)
                         .forEach(h => { used.add(h.id); pl.push(h.id); });
                 });
                 finalPool = pl;

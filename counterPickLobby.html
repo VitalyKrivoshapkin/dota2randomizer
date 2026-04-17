@@ -1192,6 +1192,14 @@
         /* ——————————————————————————————————————————————
            HELPERS
         —————————————————————————————————————————————— */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
         const buildDraftSequence = (rOrder, dOrder, mode) => {
             const seq = [];
             if (mode === 'classic') {
@@ -1286,12 +1294,12 @@
 
         // Build a random pool for a bot (3-6 heroes, some starred)
         const buildBotPool = () => {
-            const shuffled = [...HEROES].sort(() => Math.random() - 0.5);
+            const shuffled = shuffleArray([...HEROES]);
             const count = 3 + Math.floor(Math.random() * 4); // 3-6
             const heroIds = shuffled.slice(0, count).map(h => h.id);
             // Star 1-2 random heroes
             const starCount = Math.min(Math.floor(Math.random() * 2) + 1, heroIds.length);
-            const starredIds = [...heroIds].sort(() => Math.random() - 0.5).slice(0, starCount);
+            const starredIds = shuffleArray([...heroIds]).slice(0, starCount);
             return { heroIds, starredIds };
         };
 
@@ -1832,7 +1840,7 @@
 
             // Critical Fallback: if pool is empty (e.g. bot not initialized), give 8 random heroes
             if (heroPool.length < 3) {
-                const shuffled = [...HEROES].sort(() => Math.random() - 0.5);
+                const shuffled = shuffleArray([...HEROES]);
                 heroPool = shuffled.slice(0, 8).map(h => h.id);
             }
 
@@ -1913,7 +1921,7 @@
                     const reel = [];
                     for (let i = 0; i < 12; i++) {
                         // Shuffle pool for variety
-                        const shuffled = [...heroPool].sort(() => Math.random() - 0.5);
+                        const shuffled = shuffleArray([...heroPool]);
                         reel.push(...shuffled);
                     }
                     // Put winner near the end at CENTER offset from last visible

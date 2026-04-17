@@ -980,6 +980,14 @@
             setTimeout(() => t.classList.remove('show'), dur);
         };
 
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
         const addLog = (msg) => {
             const log = document.getElementById('chat-log');
             if (!log) return;
@@ -1247,7 +1255,7 @@
             const assignedPlayers = players.filter(p => p.team === 'Radiant' || p.team === 'Dire');
             if (assignedPlayers.length === 0) { toast('⚠️ No players in teams to shuffle'); return; }
 
-            const shuffled = [...assignedPlayers].sort(() => Math.random() - 0.5);
+            const shuffled = shuffleArray([...assignedPlayers]);
             const totalActive = shuffled.length;
             const tR = Math.random() > 0.5 ? Math.ceil(totalActive / 2) : Math.floor(totalActive / 2);
             let cR = 0, cD = 0;
