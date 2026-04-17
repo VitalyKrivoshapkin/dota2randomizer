@@ -1545,6 +1545,20 @@
                         <div><h3 class="text-xl font-black text-green-500 uppercase mb-3 text-center lg:text-left">Radiant</h3><div class="space-y-2">${renderHeroResultEntry('Radiant', roomData.teamSizeRadiant)}</div></div>
                         <div><h3 class="text-xl font-black text-red-600 uppercase mb-3 text-center lg:text-right">Dire</h3><div class="space-y-2">${renderHeroResultEntry('Dire', roomData.teamSizeDire)}</div></div>
                     </div>
+                    ${(roomData.vipIds || []).length > 0 ? `
+                    <div class="pt-6 border-t border-white/5">
+                        <h3 class="text-[9px] font-black text-amber-500 uppercase mb-4 tracking-widest text-center">VIP Heroes Status</h3>
+                        <div class="flex flex-wrap items-center justify-center gap-4 pb-4 px-4">
+                            ${(roomData.vipIds || []).map(id => {
+                                const h = getHeroById(id);
+                                const isPick = Object.values(roomData.picksRadiant || {}).includes(id) || Object.values(roomData.picksDire || {}).includes(id);
+                                return `<div class="w-12 h-16 rounded-xl border-2 ${isPick ? 'border-transparent hero-picked-fx' : 'border-amber-500/30'} overflow-hidden shadow-lg relative shrink-0">
+                                    ${getHeroImg(h)}
+                                    ${!isPick ? '<div class="absolute inset-0 border-2 border-amber-500/20 rounded-xl pointer-events-none"></div>' : ''}
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>` : ''}
                     <div class="pt-6 border-t border-white/5">
                         <h3 class="text-[9px] font-black text-slate-600 uppercase mb-3 tracking-widest text-center">Banned Heroes</h3>
                         <div class="flex gap-4 justify-center items-center bg-black/30 p-3 rounded-2xl max-w-xl mx-auto border border-white/5">
