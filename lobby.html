@@ -599,17 +599,34 @@
         window.toggleLangDropdown = (e) => {
             e.stopPropagation();
             window.langDropdownOpen = !window.langDropdownOpen;
+            window.volDropdownOpen = false;
+            window.render();
+        };
+
+        window.volDropdownOpen = false;
+        window.toggleVolDropdown = (e) => {
+            e.stopPropagation();
+            window.volDropdownOpen = !window.volDropdownOpen;
+            window.langDropdownOpen = false;
+            window.render();
+        };
+        window.setVolumeBtn = (vol) => {
+            SoundManager.setVolume(vol);
+            window.volDropdownOpen = false;
             window.render();
         };
 
         document.addEventListener('click', (e) => {
+            let changed = false;
             if (window.langDropdownOpen) {
                 const dropdown = document.querySelector('.lang-dropdown-container');
-                if (dropdown && !dropdown.contains(e.target)) {
-                    window.langDropdownOpen = false;
-                    window.render();
-                }
+                if (dropdown && !dropdown.contains(e.target)) { window.langDropdownOpen = false; changed = true; }
             }
+            if (window.volDropdownOpen) {
+                const dropdown = document.querySelector('.vol-dropdown-container');
+                if (dropdown && !dropdown.contains(e.target)) { window.volDropdownOpen = false; changed = true; }
+            }
+            if(changed) window.render();
         });
 
         const ANIM_DELAY = 5500;
@@ -633,7 +650,8 @@
             sfx: {},
             music: null,
             initialized: false,
-            isMuted: false,
+            isMuted: localStorage.getItem('dota_drafter_mute') === 'true',
+            volume: parseFloat(localStorage.getItem('dota_drafter_vol') || '1.0'),
             isMusicMuted: false,
             init() {
                 if (this.initialized) return;
@@ -645,17 +663,30 @@
                 assets.forEach(name => {
                     const audio = new Audio(`Assets/Sfx/${name}.mpeg`);
                     audio.load(); // Preheat
+                    audio.volume = this.volume;
                     this.sfx[name] = audio;
                 });
                 this.music = this.sfx['hero_select_track'];
                 if (this.music) {
                     this.music.loop = true;
-                    this.music.volume = 0.5;
+                    this.music.volume = this.volume * 0.5;
                 }
                 this.initialized = true;
             },
+            setVolume(v) {
+                this.volume = v;
+                this.isMuted = false;
+                localStorage.setItem('dota_drafter_vol', v.toString());
+                localStorage.setItem('dota_drafter_mute', 'false');
+                if(this.initialized) {
+                    Object.values(this.sfx).forEach(s => s.volume = this.volume);
+                    if(this.music) this.music.volume = this.volume * 0.5;
+                }
+                this.play('button_click');
+            },
             toggleMute() {
                 this.isMuted = !this.isMuted;
+                localStorage.setItem('dota_drafter_mute', this.isMuted.toString());
                 if (this.isMuted) {
                     this.stopMusic();
                     Object.values(this.sfx).forEach(s => {
@@ -2041,8 +2072,23 @@
             const roomDisp = document.getElementById('room-display'), ctrls = document.getElementById('header-controls');
             if (roomDisp) roomDisp.textContent = roomData.id ? `${t('room')}: ${roomData.id} • ${t(roomData.stage).toUpperCase()}` : 'DOTA DRAFTER';
 
-            const sfxIcon = SoundManager.isMuted ? 'volume-x' : 'volume-2';
-            const sfxBtn = `<button onclick="SoundManager.toggleMute()" class="text-slate-500 hover:text-white transition-all flex items-center justify-center p-2" title="Toggle SFX"><i data-lucide="${sfxIcon}" class="w-4 h-4"></i></button>`;
+            const sfxIcon = SoundManager.isMuted || SoundManager.volume === 0 ? 'volume-x' : (SoundManager.volume < 0.5 ? 'volume-1' : 'volume-2');
+            const volPct = SoundManager.isMuted ? 0 : Math.round(SoundManager.volume * 100);
+            const sfxSwitcher = `
+                      <div class="relative vol-dropdown-container">
+                          <button onclick="window.toggleVolDropdown(event)" class="text-slate-500 hover:text-white transition-all flex items-center justify-center gap-1 p-2 bg-white/5 rounded-xl border border-white/5 text-[10px] font-black uppercase" title="${t('toggle_sfx')}">
+                              <i data-lucide="${sfxIcon}" class="w-3.5 h-3.5"></i>
+                              <span>${volPct}%</span>
+                          </button>
+                          <div class="absolute top-full right-0 mt-2 bg-[#1a1d24] border border-white/10 rounded-xl shadow-2xl p-1 z-[100] transition-all ${window.volDropdownOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'} min-w-[80px]">
+                              <button onclick="window.setVolumeBtn(1.0)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${SoundManager.volume === 1.0 && !SoundManager.isMuted ? 'text-amber-500' : 'text-slate-400'}">100% ${SoundManager.volume === 1.0 && !SoundManager.isMuted ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                              <button onclick="window.setVolumeBtn(0.75)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${SoundManager.volume === 0.75 && !SoundManager.isMuted ? 'text-amber-500' : 'text-slate-400'}">75% ${SoundManager.volume === 0.75 && !SoundManager.isMuted ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                              <button onclick="window.setVolumeBtn(0.50)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${SoundManager.volume === 0.50 && !SoundManager.isMuted ? 'text-amber-500' : 'text-slate-400'}">50% ${SoundManager.volume === 0.50 && !SoundManager.isMuted ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                              <button onclick="window.setVolumeBtn(0.25)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${SoundManager.volume === 0.25 && !SoundManager.isMuted ? 'text-amber-500' : 'text-slate-400'}">25% ${SoundManager.volume === 0.25 && !SoundManager.isMuted ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                              <div class="h-px w-full bg-white/10 my-1"></div>
+                              <button onclick="SoundManager.toggleMute()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase transition-all flex items-center justify-between ${SoundManager.isMuted ? 'text-red-500' : 'text-slate-400'}">Mute ${SoundManager.isMuted ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</button>
+                          </div>
+                      </div>`;
 
             const langSwitcher = `
                       <div class="relative lang-dropdown-container">
@@ -2060,7 +2106,7 @@
             const controlsHtml = `
                  <div class="flex items-center gap-1 bg-white/5 py-1 px-2 rounded-2xl border border-white/5">
                       ${langSwitcher}
-                     ${sfxBtn}
+                     ${sfxSwitcher}
                      ${localUser.uid ? `
                          <div class="w-px h-4 bg-white/10 mx-1"></div>
                          <img src="${localUser.photo}" class="w-6 h-6 rounded border border-white/10">
