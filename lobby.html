@@ -2243,6 +2243,7 @@
                 onSnapshot(ref, d => {
                     if (!d.exists()) { roomData = { id: '', stage: 'entry' }; render(); }
                     else {
+                        const oldPendingHeroId = roomData.pendingHeroId;
                         const data = d.data();
                         // 1. First, merge any existing server data with roomData to not lose keys
                         // 2. Then re-apply any pending local updates
@@ -2261,6 +2262,16 @@
                                 data[k] = _pendingUpdate[k];
                             }
                         }
+
+                        // Preserve local pending pick selection against external irrelevant updates (like emojis)
+                        if (roomData.stage === data.stage) {
+                            const oldPicksTotal = Object.keys(roomData.picksRadiant || {}).length + Object.keys(roomData.picksDire || {}).length;
+                            const newPicksTotal = Object.keys(data.picksRadiant || {}).length + Object.keys(data.picksDire || {}).length;
+                            if (oldPicksTotal === newPicksTotal) {
+                                data.pendingHeroId = oldPendingHeroId;
+                            }
+                        }
+
                         roomData = data;
                         checkSoundTriggers();
                         render();
