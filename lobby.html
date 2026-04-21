@@ -1509,7 +1509,17 @@
             if (_actionLock) return;
 
             const turnP = getCurrentPickPlayer();
-            const isForMe = turnP?.uid === localUser.uid;
+            if (!turnP) return;
+            const isForMe = turnP.uid === localUser.uid;
+
+            // Pre-calculate a candidate local random pick to avoid dual-selection flicker
+            const combinedPool = [...(roomData.pool || []), ...(roomData.vipIds || [])];
+            const bansArr = Object.values(roomData.bans || {});
+            const pR = Object.values(roomData.picksRadiant || {});
+            const pD = Object.values(roomData.picksDire || {});
+            const avail = combinedPool.filter(id => !bansArr.some(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
+            if (avail.length === 0) return;
+            const candidateId = avail[Math.floor(Math.random() * avail.length)];
 
             _actionLock = true;
             if (!automated && isForMe) {
@@ -1521,18 +1531,18 @@
                 let pickedId = null;
                 let curTeam = roomData.currentTurnTeam;
                 await transactionalUpdateRoom((data) => {
-                    const turnP = getCurrentPickPlayer(data);
-                    if (!turnP || !((turnP.uid === localUser.uid) || (isAdmin(data) && turnP.uid.startsWith('bot')))) return null;
-                    const bansArr = Object.values(data.bans || {});
-                    const pR = Object.values(data.picksRadiant || {});
-                    const pD = Object.values(data.picksDire || {});
-                    const combinedPool = [...(data.pool || []), ...(data.vipIds || [])];
-                    const avail = combinedPool.filter(id => !bansArr.some(b => b.i === id) && !pR.includes(id) && !pD.includes(id));
-                    if (avail.length === 0) return null;
+                    const tP = getCurrentPickPlayer(data);
+                    if (!tP || !((tP.uid === localUser.uid) || (isAdmin(data) && tP.uid.startsWith('bot')))) return null;
+                    const bansA = Object.values(data.bans || {});
+                    const pickR = Object.values(data.picksRadiant || {});
+                    const pickD = Object.values(data.picksDire || {});
+                    const poolC = [...(data.pool || []), ...(data.vipIds || [])];
+                    const av = poolC.filter(id => !bansA.some(b => b.i === id) && !pickR.includes(id) && !pickD.includes(id));
+                    if (av.length === 0) return null;
 
-                    const hId = avail[Math.floor(Math.random() * avail.length)];
+                    const hId = av.includes(candidateId) ? candidateId : av[Math.floor(Math.random() * av.length)];
                     pickedId = hId;
-                    const teamKey = turnP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
+                    const teamKey = tP.team === 'Radiant' ? 'picksRadiant' : 'picksDire';
                     const nextPIdx = Object.keys(data[teamKey] || {}).length;
                     const nextRIdx = Object.keys(data.randomPickIds || {}).length;
                     success = true;
