@@ -2198,9 +2198,18 @@
                 updateRoom({ accelTimerStart: Date.now() }, true);
             }
 
-            // Bug fix: Admin detects when all picks are done (e.g. a non-host made the last pick).
+            // Bug fix: Admin detects when picks are made by non-hosts to trigger timer reset
             if (isAdmin() && roomData.stage === 'picking' && !_finalizingTurn) {
                 const totalPicks = Object.keys(roomData.picksRadiant || {}).length + Object.keys(roomData.picksDire || {}).length;
+                
+                if (typeof window._timerLastPickCount === 'undefined') window._timerLastPickCount = totalPicks;
+                if (totalPicks > window._timerLastPickCount) {
+                    window._timerLastPickCount = totalPicks;
+                    finalizeTurn();
+                    return;
+                }
+                window._timerLastPickCount = totalPicks;
+
                 const totalExpected = (roomData.teamSizeRadiant || 0) + (roomData.teamSizeDire || 0);
                 if (totalExpected > 0 && totalPicks >= totalExpected) { finalizeTurn(); return; }
             }
