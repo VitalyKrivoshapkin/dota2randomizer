@@ -626,7 +626,7 @@
                 const dropdown = document.querySelector('.vol-dropdown-container');
                 if (dropdown && !dropdown.contains(e.target)) { window.volDropdownOpen = false; changed = true; }
             }
-            if(changed) window.render();
+            if (changed) window.render();
         });
 
         const ANIM_DELAY = 5500;
@@ -678,9 +678,9 @@
                 this.isMuted = false;
                 localStorage.setItem('dota_drafter_vol', v.toString());
                 localStorage.setItem('dota_drafter_mute', 'false');
-                if(this.initialized) {
+                if (this.initialized) {
                     Object.values(this.sfx).forEach(s => s.volume = this.volume);
-                    if(this.music) this.music.volume = this.volume * 0.5;
+                    if (this.music) this.music.volume = this.volume * 0.5;
                 }
                 this.play('button_click');
             },
@@ -1399,7 +1399,8 @@
                 return {
                     stage: 'formation', teamSizeRadiant: r, teamSizeDire: d, draftSequence: seq,
                     pool: pl, bans: {}, picksRadiant: {}, picksDire: {}, randomPickIds: {},
-                    timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null
+                    timerStart: Date.now(), isExtraTime: false, accelTimerStart: 0, votes: {}, currentTurnTeam: 'Radiant', pendingHeroId: null,
+                    createdAt: Date.now()
                 };
             });
             if (finalPool.length > 0) {
@@ -2201,7 +2202,7 @@
             // Bug fix: Admin detects when picks are made by non-hosts to trigger timer reset
             if (isAdmin() && roomData.stage === 'picking' && !_finalizingTurn) {
                 const totalPicks = Object.keys(roomData.picksRadiant || {}).length + Object.keys(roomData.picksDire || {}).length;
-                
+
                 if (typeof window._timerLastPickCount === 'undefined') window._timerLastPickCount = totalPicks;
                 if (totalPicks > window._timerLastPickCount) {
                     window._timerLastPickCount = totalPicks;
@@ -2288,8 +2289,8 @@
                     logEvent(analytics, 'lobby_joined', { room_id: code, is_host: true });
                 } else {
                     const data = snap.data();
-                    const lastSeen = data.hostLastSeen;
-                    const isStale = !lastSeen || (Date.now() - lastSeen > 10800000); // 3 hours
+                    const createdAtTime = data.createdAt;
+                    const isStale = !createdAtTime || (Date.now() - createdAtTime > 172800000); // 2 days
 
                     if (isStale) {
                         console.log("Lobby is stale, resetting...");
